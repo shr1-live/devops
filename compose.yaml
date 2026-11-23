@@ -1,0 +1,21 @@
+services:
+  ubuntu:
+    build:
+      context: .
+      args:
+        USER_UID: ${UID:-1000}
+        USER_GID: ${GID:-1000}
+    image: devops-ubuntu
+    container_name: devops-ubuntu
+    hostname: devops-lab
+    stdin_open: true
+    tty: true
+    volumes:
+      # Your notes/experiments, editable from both host and container.
+      - ./:/home/dev/devops
+      # Keeps the home directory (shell history, dotfiles, files you create)
+      # across container restarts and rebuilds.
+      - home:/home/dev
+
+volumes:
+  home:
