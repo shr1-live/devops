@@ -17,6 +17,7 @@ Topics and where my notes are:
 
 - [x] Shell basics: [[01_Intro_to_shell]], [[02_Basic_linux_commands]], [[03_Paths]], [[04_Shell]]
 - [ ] Filesystem hierarchy, users, permissions, sudoers: [[05_Filesystem_and_permissions]] (notes written, practice pending)
+- [x] SSH user + restricting my folders from other users (chmod, umask, ACL, setgid, sshd `Match`, SFTP chroot): [[06_SSH_user_and_folder_restriction]]
 - [ ] Processes, systemd, `systemctl`, `journalctl`, `apt`, resource tools (`htop`, `vmstat`, `iostat`, `df`), SSH hardening
 - [ ] Bash scripting: defensive scripts, exit codes, pipes/redirection, grep/awk/sed/jq, cron
 - [ ] Networking: TCP/IP, DNS (`dig`, `nslookup`), HTTP/TLS, CIDR, `ufw`/`iptables`, `curl -v`, `ss`, `traceroute`, `tcpdump`
