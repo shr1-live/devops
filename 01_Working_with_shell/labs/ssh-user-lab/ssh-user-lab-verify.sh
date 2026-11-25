@@ -22,11 +22,11 @@ G=("${SSH[@]}" -i $KEYDIR/guest_ed25519 guest@localhost)
 echo "== guest over SSH (key) =="
 check "guest can log in with key"                  ok   "${G[@]}" 'id'
 check "guest can NOT log in with password"         deny ssh -p "$PORT" -o BatchMode=yes -o PubkeyAuthentication=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR guest@localhost true
-check "guest can NOT list /home/madhav"            deny "${G[@]}" 'ls /home/madhav'
-check "guest can NOT list ~madhav/secret"          deny "${G[@]}" 'ls /home/madhav/secret'
-check "guest can NOT read secret/private.txt"      deny "${G[@]}" 'cat /home/madhav/secret/private.txt'
-check "guest CAN read the one ACL-shared file"     ok   "${G[@]}" 'cat /home/madhav/secret/for-guest.txt'
-check "guest can NOT write into madhav's home"     deny "${G[@]}" 'touch /home/madhav/hack'
+check "guest can NOT list /home/shivanshu"            deny "${G[@]}" 'ls /home/shivanshu'
+check "guest can NOT list ~shivanshu/secret"          deny "${G[@]}" 'ls /home/shivanshu/secret'
+check "guest can NOT read secret/private.txt"      deny "${G[@]}" 'cat /home/shivanshu/secret/private.txt'
+check "guest CAN read the one ACL-shared file"     ok   "${G[@]}" 'cat /home/shivanshu/secret/for-guest.txt'
+check "guest can NOT write into shivanshu's home"     deny "${G[@]}" 'touch /home/shivanshu/hack'
 check "guest CAN read /srv/share (team group)"     ok   "${G[@]}" 'cat /srv/share/runbook.md'
 check "guest can NOT write /srv/share (2750)"      deny "${G[@]}" 'touch /srv/share/x'
 check "guest can NOT read /etc/shadow"             deny "${G[@]}" 'cat /etc/shadow'
@@ -37,7 +37,7 @@ S=(sftp -P "$PORT" -b - -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnow
 check "guestsftp can NOT get a shell"              deny "${SSH[@]}" -i $KEYDIR/sftp_ed25519 guestsftp@localhost 'id; echo SHELL_OK' 
 check "guestsftp CAN upload into /upload"          ok   bash -c "echo put /etc/hostname | ${S[*]}"
 check "guestsftp sees only its jail as /"          ok   bash -c "echo 'ls /' | ${S[*]} | grep -v '^sftp>' | tr -d ' ' | grep -qx '/upload'"
-check "guestsftp can NOT reach /home/madhav"       deny bash -c "echo 'ls /home/madhav' | ${S[*]}"
+check "guestsftp can NOT reach /home/shivanshu"       deny bash -c "echo 'ls /home/shivanshu' | ${S[*]}"
 
 echo
 echo "Result: $pass passed, $fail failed"

@@ -4,18 +4,18 @@
 #   sudo bash ~/devops/01_Working_with_shell/labs/ssh-user-lab/ssh-user-lab.sh   (repo container)
 #
 # What it builds
-#   madhav      : the owner. Private home (700) + private folder ~/secret (700), umask 077.
+#   shivanshu      : the owner. Private home (700) + private folder ~/secret (700), umask 077.
 #   team        : group for people I share with.
-#   /srv/share  : madhav:team 2750  -> team can READ, nobody else can see it.
+#   /srv/share  : shivanshu:team 2750  -> team can READ, nobody else can see it.
 #   guest       : SSH user given to another person. Key-only login, member of team.
-#                 Can read /srv/share, CANNOT read /home/madhav, cannot use sudo.
+#                 Can read /srv/share, CANNOT read /home/shivanshu, cannot use sudo.
 #   guestsftp   : SFTP-only user, chrooted to /sftp/guestsftp. No shell, sees only its jail.
 #   ACL demo    : guest gets read on ONE file (~/secret/for-guest.txt) without opening the folder.
 set -euo pipefail
 
 [[ $EUID -eq 0 ]] || { echo "Run as root: sudo bash $0" >&2; exit 1; }
 
-OWNER=madhav GUEST=guest SFTP_USER=guestsftp GROUP=team
+OWNER=shivanshu GUEST=guest SFTP_USER=guestsftp GROUP=team
 KEYDIR=/root/ssh-user-lab-keys          # in real life the other person creates the key and sends you only the .pub
 
 need=()
@@ -35,7 +35,7 @@ id "$SFTP_USER" &>/dev/null || useradd -M -d / -s /usr/sbin/nologin "$SFTP_USER"
 passwd -l "$SFTP_USER" >/dev/null
 
 echo "== 2. Lock down the owner's folders =="
-chmod 700 "/home/$OWNER"                # rwx------  only madhav (and root) can enter
+chmod 700 "/home/$OWNER"                # rwx------  only shivanshu (and root) can enter
 install -d -m 700 -o "$OWNER" -g "$OWNER" "/home/$OWNER/secret"
 echo "salary sheet, tokens, private notes" > "/home/$OWNER/secret/private.txt"
 echo "hello guest, you may read only this file" > "/home/$OWNER/secret/for-guest.txt"
