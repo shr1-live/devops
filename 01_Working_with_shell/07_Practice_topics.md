@@ -17,7 +17,10 @@ Every step is one short command with a plain-English note under it. A step turns
 | 3 | Networking | ip addr, ip route, /etc/hosts, resolv.conf, ping | nslookup, dig, ss, nc, listeners | ip link, ss -s, ss -tlnp, traceroute; optional internet tab | Ubuntu box (7683) |
 | 4 | NGINX | install, config, start, serve a page, logs | edit page, reverse proxy, reload | load balancing, 502 debugging, location routes | Ubuntu box (7683) |
 | 5 | Docker (Week 2) | pull, run, ps, logs, stop, rm | exec, inspect, stats, port, restart | Dockerfile, build cache, volumes, networks, DNS by name | Toolbox (7682) |
+| 6 | Git and CI/CD (Week 3) | git init, add, commit, status, log | branch, diff, merge, delete branch | .gitignore, read a GitHub Actions workflow with yq, tags | Toolbox (7682) |
+| 7 | Terraform (Week 3) | init, validate, plan, apply, output, state list | variables, fmt, state file, destroy | modules, for_each, resource addresses | Toolbox (7682) |
+| 8 | Cloud AWS / Azure (Week 3) | who am I, S3, EC2, resource groups (copy only) | IAM, VPC, subnets, security groups (copy only) | ECR, logs, assume role, OIDC (copy only) | Copy only |
 
-The sample files the steps copy (`access.log`, small scripts, NGINX configs) are in `labs/lab-files`, and the Docker example is in `../02_Docker/lab-docker`. The topics themselves are defined in `ssh-lab-ui/lab-topics.js`.
+The sample files the steps copy (`access.log`, small scripts, NGINX configs) are in `labs/lab-files`, the Docker example is in `../02_Docker/lab-docker`, and the workflow and Terraform examples are in `../03_CICD_Terraform`. The topics themselves are defined in `ssh-lab-ui/lab-topics.js`.
 
 The Week 1 milestone script is in `labs/week1-milestone/week1-milestone.sh` (`sudo bash week1-milestone.sh all`, then `verify`).

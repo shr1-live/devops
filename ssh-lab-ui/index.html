@@ -99,7 +99,7 @@
   <header>
     <button id="menu" aria-label="Open menu" aria-expanded="false">☰</button>
     <h1>DevOps Lab</h1>
-    <span id="cur"></span><span id="build" title="If this time is old after a refresh, the browser is showing a cached copy">build 26 Nov 18:40</span>
+    <span id="cur"></span><span id="build" title="If this time is old after a refresh, the browser is showing a cached copy">build 26 Nov 19:30</span>
     <span class="dot" id="dot"></span><span id="status">Connecting…</span>
     <button id="clear">Clear screen</button>
   </header>
@@ -285,12 +285,13 @@ const TOPICS = {};
 for (const T of LAB) {
   const tabs = {}, required = [];
   for (const L of T.levels) {
-    tabs[L.key] = { name: L.name, cwd: T.cwd, needs: L.needs, steps: L.steps.map(s => [s[0], s[1], s[2]]) };
-    if (!L.optional) required.push(L.key);
+    tabs[L.key] = { name: L.name, cwd: L.cwd || T.cwd, needs: L.needs, steps: L.steps.map(s => [s[0], s[1], s[2]]) };
+    if (L.copyOnly) { tabs[L.key].copyOnly = true; tabs[L.key].note = L.note; }
+    if (!L.optional && !L.copyOnly) required.push(L.key);
   }
   if (T.server) tabs.server = { name: T.server.name, copyOnly: true, note: T.server.note, steps: T.server.steps.map(s => [s[0], s[1]]) };
   if (T.qa) tabs.qa = { name: "Interview Q&A", cards: T.qa };
-  TOPICS[T.id] = { name: T.name, goal: T.goal, port: T.port, required, reset: T.reset, tabs };
+  TOPICS[T.id] = { name: T.name, goal: T.goal, port: T.port, required, reset: T.reset && T.reset.length ? T.reset : undefined, tabs };
 }
 
 { const old = { ...ASSIGNMENTS }; for (const k in old) delete ASSIGNMENTS[k]; Object.assign(ASSIGNMENTS, TOPICS, old); }  // topics first, assignments last
@@ -491,7 +492,7 @@ function render() {
   c.className = "complete" + (isDone ? " done" : "");
   c.replaceChildren();
   const msg = mk("span", "msg", isDone ? "✓ Assignment complete (" + saved.completed[curA] + ")"
-    : ready ? "All required steps passed." : "Finish every step in “" + A.tabs[A.required[0]].name + "” to complete this assignment.");
+    : ready ? "All required steps passed." : "Finish every step in “" + (A.tabs[A.required[0]] || {}).name + "” to complete this assignment.");
   const b = mk("button", isDone ? "" : "ok", isDone ? "Undo" : "✓ Mark assignment complete");
   b.disabled = !isDone && !ready;
   b.onclick = () => { if (isDone) delete saved.completed[curA]; else saved.completed[curA] = new Date().toLocaleDateString(); persist(); render(); };

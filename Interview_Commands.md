@@ -7,9 +7,9 @@ Every command from the lab (http://localhost:7000/ssh-lab.html), in the same ord
 - **Level 3 Medium**: the next step up, built one piece at a time.
 - **Interview Q&A**: the question as it is asked, and the short answer.
 
-Where a step says `~/lab` it is a practice folder, so nothing important is touched. Sample files come from `/scripts/lab-files`.
+Where a step says `~/lab` it is a practice folder, so nothing important is touched. Sample files come from `/scripts/lab-files` (Linux box) and `/work/lab-*` (toolbox).
 
-> The Docker topic (5) was written against Docker Desktop but not yet run end to end, because the Docker engine was not responding when this was generated.
+> Topic 5 (Docker) was written against Docker Desktop but not yet run end to end, because the Docker engine was not responding. Topic 3 has an optional tab that needs internet. Topic 8 (Cloud) is copy-only: there is no cloud account in the lab.
 
 ---
 
@@ -1066,3 +1066,519 @@ docker system df                              # See disk used by Docker
 **8. How do two containers talk to each other?**
 
 - Answer: Put them on the same user-defined network and use the container name as the host name (Docker's built-in DNS).
+
+---
+
+## 6 · Git and CI/CD (Week 3)
+
+Git first (commit, branch, merge), then read a real GitHub Actions workflow file and ask it questions. The pipeline itself runs on GitHub, so the last tab is copy-only.
+
+### Level 1 · Basic
+
+```bash
+mkdir -p ~/lab                                # Make a practice folder
+cd ~/lab                                      # Go into it
+git init -b main app                          # Create a repository
+cd app                                        # Go into the repository
+git config user.name 'Lab User'               # Tell git who you are
+git config user.email 'lab@example.com'       # And your email
+git config core.pager cat                     # Turn off the pager
+echo hello > app.txt                          # Create a file
+git status                                    # Check the state
+git add app.txt                               # Stage the file
+git commit -m 'first commit'                  # Save a commit
+git log --oneline                             # See the history
+git status                                    # Check again
+```
+
+What each one means:
+
+1. `mkdir -p ~/lab`  
+   All git practice stays inside ~/lab.
+2. `cd ~/lab`  
+   cd = change directory.
+3. `git init -b main app`  
+   git init turns a folder into a repository: it adds a hidden .git folder that stores the whole history. -b main names the first branch main.
+4. `cd app`  
+   Everything from here on happens inside app.
+5. `git config user.name 'Lab User'`  
+   Every commit records an author. Without --global this applies to this repository only.
+6. `git config user.email 'lab@example.com'`  
+   Use your real email on a real project: GitHub matches commits to your account with it.
+7. `git config core.pager cat`  
+   By default git opens long output in a pager (press q to quit). cat just prints it, which is easier here.
+8. `echo hello > app.txt`  
+   A new file. Git does not track it yet.
+9. `git status`  
+   git status is the command you will type most. 'Untracked' = git sees the file but is not watching it.
+10. `git add app.txt`  
+   git add puts the change in the staging area: the list of changes that go into the next commit. git add . stages everything.
+11. `git commit -m 'first commit'`  
+   A commit is a snapshot with a message. -m gives the message. Write what changed and why.
+12. `git log --oneline`  
+   One line per commit: short id and message. HEAD is where you are now.
+13. `git status`  
+   'nothing to commit, working tree clean' = everything is saved.
+
+### Level 2 · Next level
+
+```bash
+git switch -c feature                         # Start a new branch
+echo change >> app.txt                        # Change the file
+git diff                                      # See what changed
+git add app.txt                               # Stage it
+git commit -m 'add change'                    # Commit it
+git log --oneline                             # Look at the history
+git switch main                               # Go back to main
+git merge feature                             # Merge the branch
+git branch                                    # List branches
+git branch -d feature                         # Delete the finished branch
+```
+
+What each one means:
+
+1. `git switch -c feature`  
+   A branch is a separate line of work. -c creates it and switches. Real teams make one branch per change and open a pull request.
+2. `echo change >> app.txt`  
+   >> adds a line at the end.
+3. `git diff`  
+   git diff shows changes that are NOT staged yet. + lines were added, - lines removed. git diff --staged shows what is staged.
+4. `git add app.txt`  
+   Staging again.
+5. `git commit -m 'add change'`  
+   The commit goes on the feature branch only.
+6. `git log --oneline`  
+   Two commits now. The newest is on top.
+7. `git switch main`  
+   main does not have the change yet.
+8. `git merge feature`  
+   merge brings the feature commits into main. Fast-forward = main had no new commits, so git just moves the pointer. Otherwise git makes a merge commit and conflicts may appear.
+9. `git branch`  
+   The star marks the branch you are on.
+10. `git branch -d feature`  
+   -d only deletes if it is merged. -D forces it.
+
+### Level 3 · Medium
+
+```bash
+echo '*.log' > .gitignore                     # Ignore log files
+touch debug.log                               # Create a log file
+git status --short                            # Check what git sees
+mkdir -p .github/workflows                    # Make the workflow folder
+cp /work/lab-ci/ci.yml .github/workflows/ci.yml# Copy a sample workflow
+cat .github/workflows/ci.yml                  # Read it
+yq '.on' .github/workflows/ci.yml             # Ask it: when does it run?
+yq '.jobs.build.steps[].name' .github/workflows/ci.yml# Ask it: what are the steps?
+git add .                                     # Stage everything
+git commit -m 'add CI workflow'               # Commit the workflow
+git log --oneline                             # See the history
+git tag v1.0                                  # Tag a release
+git tag                                       # List tags
+```
+
+What each one means:
+
+1. `echo '*.log' > .gitignore`  
+   .gitignore lists files git must never track: logs, build output, secrets like .env.
+2. `touch debug.log`  
+   This file matches the pattern, so git will ignore it.
+3. `git status --short`  
+   --short = one line per file. ?? = untracked. debug.log is not listed because it is ignored.
+4. `mkdir -p .github/workflows`  
+   GitHub runs every YAML file in .github/workflows. The folder name is fixed.
+5. `cp /work/lab-ci/ci.yml .github/workflows/ci.yml`  
+   A small CI pipeline: on every push to main (and every pull request) it checks out the code, runs tests and builds an image.
+6. `cat .github/workflows/ci.yml`  
+   name = the workflow name. on = triggers. jobs = parallel groups of work. runs-on = the machine type. steps = commands in order. uses = a ready-made action, run = a shell command.
+7. `yq '.on' .github/workflows/ci.yml`  
+   yq reads YAML like jq reads JSON. The triggers are push to main and any pull request.
+8. `yq '.jobs.build.steps[].name' .github/workflows/ci.yml`  
+   The steps run top to bottom. If one fails, the job stops and the pull request shows a red cross.
+9. `git add .`  
+   Stages the new files. debug.log is skipped.
+10. `git commit -m 'add CI workflow'`  
+   Pushing this file to GitHub is all it takes to start the pipeline.
+11. `git log --oneline`  
+   Your pipeline is now versioned like any other code.
+12. `git tag v1.0`  
+   A tag is a permanent name for a commit, used for releases. A workflow can trigger on tags.
+13. `git tag`  
+   Tags follow semantic versioning: v1.0.0 (major.minor.patch).
+
+### On GitHub (copy only) (copy only)
+
+These live in the workflow file or run on GitHub. Copy them into ci.yml when you want to try them.
+
+```bash
+on: { workflow_dispatch: {}, schedule: [{ cron: '0 2 * * *' }] }# Run on a schedule or by hand
+strategy: { matrix: { node: [18, 20] } }      # Run the job on several versions (matrix)
+env: { TOKEN: '${{ secrets.MY_TOKEN }}' }     # Use a secret
+uses: actions/cache@v4                        # Cache dependencies
+uses: actions/upload-artifact@v4              # Keep a build result
+permissions: { id-token: write, contents: read }# Log in to AWS without a stored key (OIDC)
+needs: build                                  # Run one job after another
+```
+
+1. `on: { workflow_dispatch: {}, schedule: [{ cron: '0 2 * * *' }] }`  
+   workflow_dispatch adds a 'Run workflow' button. schedule uses cron syntax (UTC).
+2. `strategy: { matrix: { node: [18, 20] } }`  
+   One job definition runs once per value, in parallel. Use ${{ matrix.node }} inside the steps.
+3. `env: { TOKEN: '${{ secrets.MY_TOKEN }}' }`  
+   Secrets are set in the repository settings. They are masked in the logs. Never print them or commit them.
+4. `uses: actions/cache@v4`  
+   Saves a folder (node_modules, ~/.m2) between runs so builds are faster. The key decides when the cache is reused.
+5. `uses: actions/upload-artifact@v4`  
+   Saves files (reports, binaries) so you can download them or use them in a later job.
+6. `permissions: { id-token: write, contents: read }`  
+   OIDC lets GitHub prove its identity to the cloud and get a short-lived token. No long-lived access keys in your secrets.
+7. `needs: build`  
+   By default jobs run in parallel. needs makes a job wait for another one.
+
+### Interview Q&A
+
+**1. Workflow, job, step: what is the difference?**
+
+- Workflow: One YAML file. Starts on an event (push, pull request, schedule).
+- Job: A group of steps that runs on one machine. Jobs run in parallel unless one needs another.
+- Step: One command (run) or one ready-made action (uses).
+
+**2. What is CI and what is CD?**
+
+- CI: Continuous Integration: every push is built and tested automatically, so broken code is found early.
+- CD: Continuous Delivery/Deployment: a tested build is released automatically (delivery stops at a manual approval, deployment goes all the way).
+
+**3. How do you keep secrets safe in a pipeline?**
+
+- Answer: Store them as encrypted secrets, never in the repository. Prefer OIDC (short-lived tokens) over long-lived keys. Give each job the least permission it needs.
+
+**4. What is a matrix build?**
+
+- Answer: One job that runs several times with different values (OS, language version), in parallel.
+
+**5. How do you make a pipeline faster?**
+
+- Ideas: Cache dependencies, run independent jobs in parallel, build only what changed, use a smaller base image.
+
+**6. Merge vs rebase?**
+
+- Merge: Keeps all history and adds a merge commit.
+- Rebase: Replays your commits on top of the target for a straight, clean history. Never rebase commits that others already use.
+
+**7. How do you undo things in git?**
+
+- Not committed: git restore FILE discards changes to a file.
+- Committed: git revert COMMIT makes a new commit that undoes it (safe for shared branches). git reset moves the branch back (rewrites history).
+
+---
+
+## 7 · Terraform (Week 3)
+
+Write, plan and apply infrastructure as code. The lab uses Terraform's built-in terraform_data resource, so it needs no cloud account and no internet: same workflow, nothing to pay for.
+
+### Level 1 · Basic
+
+```bash
+mkdir -p ~/tf                                 # Make a project folder
+cd ~/tf                                       # Go into it
+terraform version                             # Which version?
+cp /work/lab-tf/basic.tf main.tf              # Copy a small configuration
+cat main.tf                                   # Read it
+terraform init                                # Initialise
+terraform validate                            # Check the syntax
+terraform plan                                # See the plan
+terraform apply -auto-approve                 # Apply it
+terraform output                              # Show the outputs
+terraform state list                          # List what Terraform manages
+```
+
+What each one means:
+
+1. `mkdir -p ~/tf`  
+   A Terraform project is just a folder of .tf files.
+2. `cd ~/tf`  
+   Terraform always works on the files in the current folder.
+3. `terraform version`  
+   Version of the tool. Teams pin it, because state files from a newer version cannot be read by an older one.
+4. `cp /work/lab-tf/basic.tf main.tf`  
+   main.tf is the usual name for the main file.
+5. `cat main.tf`  
+   variable = an input with a default. resource = a thing Terraform manages (type, then your name). output = a value printed at the end. Cloud resources look the same, for example aws_s3_bucket.
+6. `terraform init`  
+   init downloads providers and sets up the backend. Run it first in every new folder, and again after you add a provider or module.
+7. `terraform validate`  
+   validate checks the files for mistakes without touching anything.
+8. `terraform plan`  
+   plan compares your code with reality and shows what WOULD change. + create, ~ change, - destroy. Always read it before applying.
+9. `terraform apply -auto-approve`  
+   apply makes the change. -auto-approve skips the yes/no question: fine in a lab, in real life review the plan first.
+10. `terraform output`  
+   Outputs are the values you want to read afterwards: an IP address, a URL.
+11. `terraform state list`  
+   The state file is Terraform's memory of what it created. Without it Terraform would not know what exists.
+
+### Level 2 · Next level
+
+```bash
+terraform plan                                # Plan again
+terraform apply -auto-approve -var name=Asha  # Change an input variable
+terraform output greeting                     # Read the new output
+terraform fmt                                 # Format the code
+terraform validate                            # Check the syntax again
+terraform plan -var name=Ravi                 # Preview another change
+ls                                            # Look at the state file
+terraform state show terraform_data.hello     # Inspect one resource
+terraform destroy -auto-approve               # Destroy everything
+terraform state list                          # Check that it is empty
+```
+
+What each one means:
+
+1. `terraform plan`  
+   Nothing changed, so nothing to do. This is idempotence: applying twice gives the same result.
+2. `terraform apply -auto-approve -var name=Asha`  
+   -var overrides a variable for one run. Real projects use a terraform.tfvars file instead.
+3. `terraform output greeting`  
+   Naming the output prints just its value, handy in scripts.
+4. `terraform fmt`  
+   fmt fixes indentation and spacing. It prints the names of files it changed. No output = already tidy. CI pipelines run terraform fmt -check.
+5. `terraform validate`  
+   Run validate and fmt before every commit.
+6. `terraform plan -var name=Ravi`  
+   A plan is only a preview. Nothing changes until apply.
+7. `ls`  
+   terraform.tfstate holds the real values. It can contain secrets, so never commit it to git. Teams keep it in a remote backend (S3 + DynamoDB lock, or Azure Storage) so two people cannot apply at once.
+8. `terraform state show terraform_data.hello`  
+   Shows everything Terraform knows about one resource.
+9. `terraform destroy -auto-approve`  
+   destroy removes every resource in the state. In real life, be very careful.
+10. `terraform state list`  
+   No output = nothing is managed any more.
+
+### Level 3 · Medium
+
+```bash
+mkdir -p ~/tf2                                # Make a second project
+cd ~/tf2                                      # Go into it
+cp -r /work/lab-tf/mod/. .                    # Copy the project
+ls                                            # See the layout
+cat main.tf                                   # Read the root file
+cat modules/greeter/main.tf                   # Read the module
+terraform init                                # Initialise
+terraform plan                                # Plan
+terraform apply -auto-approve                 # Apply
+terraform output                              # Show the output
+terraform state list                          # See the addresses
+terraform destroy -auto-approve               # Clean up
+```
+
+What each one means:
+
+1. `mkdir -p ~/tf2`  
+   A fresh folder for a project that uses a module.
+2. `cd ~/tf2`  
+   cd = change directory.
+3. `cp -r /work/lab-tf/mod/. .`  
+   Copies main.tf and a modules folder. The dot at the end means 'into this folder'.
+4. `ls`  
+   A module is just a folder with .tf files that you reuse, like a function.
+5. `cat main.tf`  
+   The module block calls the module: source = where it is, names = the input it needs.
+6. `cat modules/greeter/main.tf`  
+   for_each creates one resource per item in the list. count = N is the simpler cousin. Prefer for_each when items have names, because removing one does not renumber the others.
+7. `terraform init`  
+   init also loads the modules this time.
+8. `terraform plan`  
+   Three names in the list = three resources.
+9. `terraform apply -auto-approve`  
+   All three are created.
+10. `terraform output`  
+   The module returned a list; the root file printed it.
+11. `terraform state list`  
+   module.NAME.TYPE.NAME[key] is the full address of a resource inside a module.
+12. `terraform destroy -auto-approve`  
+   Removes the three resources.
+
+### With a real cloud (copy only) (copy only)
+
+These need a cloud account. Copy them when you practise on a KodeKloud AWS or Azure playground.
+
+```bash
+backend "s3" { bucket = "my-state" key = "app/terraform.tfstate" region = "us-east-1" dynamodb_table = "tf-lock" }# Store state remotely with locking (AWS)
+terraform init -migrate-state                 # Move local state to the backend
+resource "aws_s3_bucket" "logs" { bucket = "my-unique-logs-bucket" }# A real resource
+terraform import aws_s3_bucket.logs my-unique-logs-bucket# Bring an existing resource under Terraform
+terraform plan -out=tfplan                    # Run it in a pipeline
+```
+
+1. `backend "s3" { bucket = "my-state" key = "app/terraform.tfstate" region = "us-east-1" dynamodb_table = "tf-lock" }`  
+   State goes into an S3 bucket and DynamoDB blocks two people from applying at the same time. Azure uses a storage account with blob lease locking.
+2. `terraform init -migrate-state`  
+   After adding a backend block, this copies your existing state into it.
+3. `resource "aws_s3_bucket" "logs" { bucket = "my-unique-logs-bucket" }`  
+   Same shape as the lab resource. The provider (aws) talks to the cloud API.
+4. `terraform import aws_s3_bucket.logs my-unique-logs-bucket`  
+   import adds a resource that was created by hand to the state. You still have to write the matching code.
+5. `terraform plan -out=tfplan`  
+   Save the plan in CI, show it on the pull request, and apply that exact plan after approval: terraform apply tfplan.
+
+### Interview Q&A
+
+**1. What is the Terraform state and why is it important?**
+
+- Answer: The file where Terraform records what it created. It maps your code to real resources. Lose it and Terraform no longer knows what exists.
+- Teams: Keep it in a remote backend with locking, encrypted, never in git.
+
+**2. terraform plan vs apply?**
+
+- plan: Preview only. Compares code, state and reality.
+- apply: Makes the changes. In CI you apply the saved plan after approval.
+
+**3. What is drift and how do you handle it?**
+
+- Drift: Someone changed the real infrastructure by hand, so it no longer matches the code.
+- Fix: terraform plan shows the difference. Apply to put it back, or update the code to match.
+
+**4. count vs for_each?**
+
+- count: N copies, addressed by number (0, 1, 2). Removing item 0 shifts the others.
+- for_each: One per key in a map or set, addressed by name. Safer for changes.
+
+**5. What is a module?**
+
+- Answer: A reusable folder of Terraform code with inputs (variables) and outputs. Used to avoid copy and paste, for example one VPC module for every environment.
+
+**6. How do you handle secrets?**
+
+- Answer: Mark variables sensitive = true, pass them from environment variables or a secret manager, and keep the state encrypted. They still end up in state, so protect the state.
+
+**7. Terraform vs Ansible?**
+
+- Terraform: Creates infrastructure (servers, networks). Declarative, keeps state.
+- Ansible: Configures what runs ON the servers (packages, files). Usually no state.
+
+---
+
+## 8 · Cloud AWS / Azure (Week 3)
+
+Cloud basics you are asked about: who am I, storage, servers, networks and permissions. There is no cloud account in the lab, so the commands are copy-only for a KodeKloud playground. The Q&A tab is the part to learn.
+
+### Level 1 · Basic (copy only)
+
+```bash
+aws sts get-caller-identity                   # Who am I? (AWS)
+az account show                               # Who am I? (Azure)
+aws s3 ls                                     # List storage buckets (AWS S3)
+aws s3 cp notes.txt s3://my-bucket/           # Upload a file to S3
+aws ec2 describe-instances --query 'Reservations[].Instances[].InstanceId'# List servers (AWS EC2)
+az group list -o table                        # List resource groups (Azure)
+az vm list -o table                           # List VMs (Azure)
+```
+
+What each one means:
+
+1. `aws sts get-caller-identity`  
+   Shows the account number and the user or role you are using. First command when something says 'access denied'.
+2. `az account show`  
+   Shows the subscription and tenant. az login signs you in.
+3. `aws s3 ls`  
+   S3 = object storage: files in buckets. Cheap, durable, used for backups, logs, websites and Terraform state.
+4. `aws s3 cp notes.txt s3://my-bucket/`  
+   cp copies between local and S3. aws s3 sync syncs whole folders.
+5. `aws ec2 describe-instances --query 'Reservations[].Instances[].InstanceId'`  
+   EC2 = virtual servers. --query filters the JSON output.
+6. `az group list -o table`  
+   A resource group is a folder for related resources. -o table = readable output.
+7. `az vm list -o table`  
+   Azure virtual machines.
+
+### Level 2 · Next level (copy only)
+
+```bash
+aws iam list-users                            # List IAM users
+aws iam list-roles                            # List IAM roles
+aws ec2 describe-vpcs                         # List VPCs
+aws ec2 describe-subnets                      # List subnets
+aws ec2 describe-security-groups              # List security groups
+az network vnet list -o table                 # List Azure networks
+az role assignment list -o table              # List Azure role assignments
+```
+
+What each one means:
+
+1. `aws iam list-users`  
+   IAM = who may do what. A USER is a person, a ROLE is an identity that services or people assume temporarily. Prefer roles.
+2. `aws iam list-roles`  
+   Roles hold permissions through policies and give short-lived credentials.
+3. `aws ec2 describe-vpcs`  
+   A VPC is your private network in the cloud, with its own IP range (CIDR, for example 10.0.0.0/16).
+4. `aws ec2 describe-subnets`  
+   Subnets split the VPC. Public subnet = has a route to an internet gateway. Private subnet = no direct internet, uses a NAT gateway to go out.
+5. `aws ec2 describe-security-groups`  
+   A security group is a firewall around a server. Stateful: if a request is allowed in, the reply is allowed out.
+6. `az network vnet list -o table`  
+   VNet = Azure's VPC. NSG = network security group, the firewall.
+7. `az role assignment list -o table`  
+   Azure RBAC: who has which role on which scope.
+
+### Level 3 · Medium (copy only)
+
+```bash
+aws ecr get-login-password                    # Log in to the container registry (AWS ECR)
+aws logs tail /aws/lambda/my-function --follow# Read application logs (CloudWatch)
+aws cloudwatch describe-alarms                # List alarms
+aws sts assume-role --role-arn ARN --role-session-name lab# Assume a role
+aws-actions/configure-aws-credentials with role-to-assume# Keyless login from GitHub (idea)
+```
+
+What each one means:
+
+1. `aws ecr get-login-password`  
+   ECR stores your Docker images. The password is piped to docker login. Azure's version is ACR: az acr login --name NAME.
+2. `aws logs tail /aws/lambda/my-function --follow`  
+   CloudWatch Logs collects logs and metrics. Azure Monitor is the equivalent.
+3. `aws cloudwatch describe-alarms`  
+   Alarms notify you when a metric (CPU, errors) crosses a limit.
+4. `aws sts assume-role --role-arn ARN --role-session-name lab`  
+   Returns temporary keys. This is the safe way to get higher access for a short time.
+5. `aws-actions/configure-aws-credentials with role-to-assume`  
+   A GitHub workflow proves who it is with OIDC and assumes a role. No access keys are stored.
+
+### Interview Q&A
+
+**1. What is IAM and what is least privilege?**
+
+- IAM: The service that controls who (users, roles) may do what (policies) on which resources.
+- Least privilege: Give only the permissions needed for the job, nothing more. Start with none and add.
+
+**2. IAM user vs role?**
+
+- User: A long-lived identity for a person, with keys or a password.
+- Role: A temporary identity assumed by a person, service or pipeline. No stored keys. Preferred.
+
+**3. Public vs private subnet?**
+
+- Public: Has a route to an internet gateway. Load balancers and bastion hosts live here.
+- Private: No inbound internet. Apps and databases live here and use a NAT gateway for outbound traffic.
+
+**4. What is a NAT gateway?**
+
+- Answer: Lets servers in a private subnet reach the internet (updates, APIs) without the internet being able to reach them.
+
+**5. Security group vs network ACL?**
+
+- Security group: Firewall on the server. Stateful. Allow rules only.
+- Network ACL: Firewall on the subnet. Stateless: you must allow replies too. Allow and deny rules.
+
+**6. Region vs availability zone?**
+
+- Region: A geographic area (Mumbai, Frankfurt).
+- Availability zone: One or more separate data centres inside a region. Spread servers across zones to survive a failure.
+
+**7. EC2 vs Lambda (VM vs serverless)?**
+
+- EC2: You run a server and pay while it is on. Full control.
+- Lambda: You upload a function, the cloud runs it on demand. Pay per run. Good for short, event-driven work.
+
+**8. How does a pipeline log in to the cloud safely?**
+
+- Answer: OIDC: the pipeline gets a short-lived token and assumes a role. No long-lived access keys in secrets.

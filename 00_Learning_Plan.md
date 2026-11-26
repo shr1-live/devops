@@ -48,6 +48,16 @@ Daily progress:
 - AWS/Azure: IAM least privilege, VPC/VNet, public/private subnets, NAT, security groups, compute, storage, monitoring.
 - Terraform: HCL, state and remote backend locking, variables, reusable modules, plan/apply in CI.
 
+Daily progress (lab topics 6, 7 and 8, all in `Interview_Commands.md`):
+
+- [ ] Day 15: Git basics: init, add, commit, status, log (topic 6, Level 1)
+- [ ] Day 16: branches, merge, `.gitignore`, tags (topic 6, Levels 2 and 3)
+- [ ] Day 17: GitHub Actions: read and write a workflow, secrets, matrix, OIDC (topic 6, Q&A and copy-only tab)
+- [ ] Day 18: Terraform basics: init, plan, apply, state (topic 7, Level 1)
+- [ ] Day 19: variables, modules, `for_each`, remote state with locking (topic 7, Levels 2 and 3)
+- [ ] Day 20: AWS / Azure: IAM, VPC, subnets, security groups (topic 8, on a KodeKloud playground)
+- [ ] Day 21: milestone: Terraform-provisioned infra plus a pipeline that pushes an image via OIDC
+
 **Milestone lab:** modular Terraform with remote state for VPC/VNet, IAM roles and a container registry, plus a pipeline that tests, builds, scans and pushes the image via OIDC.
 
 ## Week 4: Kubernetes and Helm
