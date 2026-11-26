@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>DevOps Lab</title>
+<link rel="stylesheet" href="vendor/xterm.css">
+<style>
+  :root { color-scheme: dark; --bg:#0d1117; --panel:#161b22; --line:#30363d; --text:#e6edf3; --mute:#8b949e;
+          --blue:#1f6feb; --ok:#3fb950; --bad:#f85149; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; overflow:hidden; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, "Segoe UI", sans-serif; }
+  .app { height:100%; height:100dvh; display:grid; grid-template-columns:clamp(320px,36vw,440px) minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
+  .views { display:none; }
+  @media (max-width:800px) {
+    .app { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr); }
+    .views { display:flex; gap:6px; padding:8px 12px; border-bottom:1px solid var(--line); }
+    .views button { flex:1; } .views button.on { background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600; }
+    aside, main { grid-column:1; grid-row:3; }
+    aside { border-right:0; }
+    .app.v-steps main, .app.v-term aside { display:none; }
+    header { padding:8px 12px; }
+    #clear { display:none; }
+    .m .row { grid-template-columns:1fr; gap:2px; }
+  }
+  @media (max-width:480px) { #cur { display:none; } .bar .grow { flex-basis:100%; text-align:left; } }
+
+  header { grid-column:1/-1; display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  #menu { font-size:18px; line-height:1; padding:4px 10px; }
+  #build { color:var(--mute); font-size:11px; opacity:.7; white-space:nowrap; }
+  @media (max-width:800px){ #build { display:none; } }
+  #cur { flex:1; min-width:0; color:var(--mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .scrim { position:fixed; inset:0; background:rgba(0,0,0,.55); opacity:0; pointer-events:none; transition:opacity .2s; z-index:20; }
+  .drawer { position:fixed; top:0; bottom:0; left:0; width:min(300px,86vw); background:var(--bg); border-right:1px solid var(--line); z-index:21;
+            transform:translateX(-100%); transition:transform .2s; padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+  body.nav-open .drawer { transform:none; } body.nav-open .scrim { opacity:1; pointer-events:auto; }
+  .drawer h2 { margin:10px 4px 2px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--mute); font-weight:600; }
+  .drawer .top { display:flex; align-items:center; justify-content:space-between; font-weight:600; }
+  .drawer .chip { text-align:left; width:100%; padding:9px 12px; }
+  .assign { display:flex; flex-direction:column; gap:6px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--bad); }
+  .dot.on { background:var(--ok); }
+  button { font:inherit; cursor:pointer; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:5px 12px; }
+  button:hover { border-color:#58a6ff; }
+  button:disabled { opacity:.45; cursor:default; border-color:var(--line); }
+  .chip.on { background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600; }
+  .chip .tick { color:var(--ok); margin-left:4px; }
+  .chip.on .tick { color:#fff; }
+
+  aside { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); }
+  .goal { margin:0; padding:10px 14px 0; color:var(--mute); font-size:13px; }
+  .tabs { display:flex; gap:6px; padding:10px 12px 0; flex-wrap:wrap; }
+  .tab { border-radius:6px 6px 0 0; border-bottom:none; background:transparent; color:var(--mute); }
+  .tab.on { background:var(--panel); color:var(--text); }
+  .bar { display:flex; align-items:center; gap:8px; padding:10px 12px; background:var(--panel); border-top:1px solid var(--line); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .bar .grow { flex:1; color:var(--mute); font-size:13px; text-align:right; }
+  .primary { background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600; }
+  .primary.stop { background:#da3633; border-color:#da3633; }
+  .danger { color:var(--bad); }
+
+  .complete { padding:10px 12px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; font-size:13px; }
+  .complete .msg { flex:1; color:var(--mute); }
+  .complete.done { background:#0f2a1a; }
+  .complete.done .msg { color:var(--ok); font-weight:600; }
+  .complete button.ok { background:#238636; border-color:#238636; color:#fff; font-weight:600; }
+
+  ol { list-style:none; margin:0; padding:8px 12px 16px; overflow-y:auto; flex:1; min-height:0; }
+  li { display:grid; grid-template-columns:26px minmax(0,1fr) auto; gap:8px; align-items:start; padding:8px; border-radius:8px; border:1px solid transparent; }
+  li + li { margin-top:2px; }
+  li.running { background:#10243f; border-color:var(--blue); }
+  li.done .st { color:var(--ok); }
+  li.fail { background:#2a1517; border-color:#6e2b2f; }
+  li.fail .st { color:var(--bad); }
+  .st { color:var(--mute); text-align:center; font-weight:700; padding-top:1px; }
+  li.running .st { color:var(--blue); }
+  .desc { font-weight:600; }
+  code { white-space:pre-wrap; display:block; color:var(--mute); font:12px ui-monospace, Consolas, monospace; margin-top:2px; overflow-wrap:anywhere; }
+  .why { margin-top:5px; padding:5px 8px; border-left:2px solid #388bfd; background:#10213a; color:#b6d4ff; font-size:12.5px; border-radius:0 6px 6px 0; }
+  li.running .why { background:#14305a; color:#dbe9ff; }
+  code.failout { color:#ff9b95; border-left:2px solid var(--bad); padding-left:8px; margin-top:6px; }
+  .go { padding:2px 9px; font-size:12px; }
+  .note { color:var(--mute); font-size:12.5px; padding:2px 8px 8px; }
+
+  .m { margin:0 0 12px; padding:10px 12px; background:var(--panel); border:1px solid var(--line); border-radius:8px; }
+  .m > code { color:var(--text); font-size:13px; margin:0 0 8px; }
+  .m .row { display:grid; grid-template-columns:150px minmax(0,1fr); gap:10px; padding:4px 0; border-top:1px solid var(--line); }
+  .m .part { font:12.5px ui-monospace, Consolas, monospace; color:#79c0ff; overflow-wrap:anywhere; }
+  .listwrap { display:block; }
+
+  main { position:relative; min-height:0; background:#0b0f14; }
+  #term { position:absolute; inset:0; padding:8px 0 0 10px; }
+  .xterm .xterm-viewport { background-color:#0b0f14 !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <button id="menu" aria-label="Open menu" aria-expanded="false">☰</button>
+    <h1>DevOps Lab</h1>
+    <span id="cur"></span><span id="build" title="If this time is old after a refresh, the browser is showing a cached copy">build 25 Nov 18:12</span>
+    <span class="dot" id="dot"></span><span id="status">Connecting…</span>
+    <button id="clear">Clear screen</button>
+  </header>
+
+  <div class="views" id="views"><button data-v="steps" class="on">Steps</button><button data-v="term">Terminal</button></div>
+
+  <aside>
+    <p class="goal" id="goal"></p>
+    <div class="tabs" id="tabs"></div>
+    <div class="bar" id="bar">
+      <button class="primary" id="runall">▶ Run all, one by one</button>
+      <button id="clearticks" title="Clear the green ticks (does not change the machine)">Clear ticks</button>
+      <button class="danger" id="reset" title="Delete the lab users and folders so you can start again">Reset lab</button>
+      <span class="grow" id="count"></span>
+    </div>
+    <div class="complete" id="complete"></div>
+    <ol id="steps"></ol>
+  </aside>
+
+  <main><div id="term"></div></main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<nav class="drawer" id="drawer" aria-label="Topics and assignments">
+  <div class="top"><span>DevOps Lab</span><button id="closenav" aria-label="Close menu">✕</button></div>
+  <div class="assign" id="assign"></div>
+</nav>
+
+<script src="vendor/xterm.js"></script>
+<script src="vendor/addon-fit.js"></script>
+<script>
+/* ============ the assignments ============
+   steps: [description, command, optional /regex/ that the output must match for the step to count as passed] */
+const MEANINGS_A1 = [
+  ["bash /scripts/ssh-user-lab.sh", [["bash","run a script with the bash shell"],["/scripts/ssh-user-lab.sh","the setup script: makes the users, locks the folders, sets up SSH"]]],
+  ["bash /scripts/ssh-user-lab-verify.sh", [["…-verify.sh","logs in as each user over real SSH, checks 15 things, prints PASS or FAIL"]]],
+  ["su - guest -c '…'", [["su","switch user"],["-","start fresh, like really logging in as them"],["guest","the user to become"],["-c '…'","run just this one command as that user, then come back to root"]]],
+  ["ls /home/shivanshu", [["ls","list what is inside a folder"],["/home/shivanshu","the folder to look in"]]],
+  ["cat FILE", [["cat","print a file's contents on the screen"]]],
+  ["ls -ld A B", [["-l","long format: shows the permissions, like drwx------"],["-d","show the folder itself, not what is inside it"]]],
+  ["useradd -m -s /bin/bash guest", [["useradd","create a new user"],["-m","also create their home folder"],["-s /bin/bash","give them the bash shell to log in with"],["guest","the new user's name"]]],
+  ["echo 'guest:Pass123' | chpasswd", [["echo '…'","print the text user:password"],["|","pipe: hand that text to the next command"],["chpasswd","set the password from user:password"]]],
+  ["mkdir PATH", [["mkdir","make a new folder"]]],
+  ["echo 'text' > FILE", [["echo 'text'","print the text"],[">","send it into a file instead of the screen (replaces the file)"]]],
+  ["chmod 700 /home/shivanshu", [["chmod","change who can read, write or enter"],["7","owner: read 4 + write 2 + enter 1"],["0","group: nothing"],["0","everyone else: nothing"]]],
+  ["groupadd team", [["groupadd","create a group of users"],["team","the group's name"]]],
+  ["usermod -aG team guest", [["usermod","change an existing user"],["-a","add to the group, keep their other groups"],["-G team","the group to add them to"]]],
+  ["chown shivanshu:team A B", [["chown","change who owns a file or folder"],["shivanshu:team","new owner : new group"]]],
+  ["chmod 750 /srv/share", [["7","owner: read, write, enter"],["5","group (team): read 4 + enter 1, no write"],["0","everyone else: nothing"]]],
+  ["chmod 640 /srv/share/runbook.md", [["6","owner: read + write"],["4","group (team): read only"],["0","everyone else: nothing"]]],
+  ["touch /srv/share/x", [["touch","create an empty file, which tests if you are allowed to write there"]]],
+  ["getent group team; ls -l /srv/share", [["getent group team","show the team group and its members"],[";","then run the next command"],["ls -l","list the files with their permissions"]]],
+];
+const HAND = [
+  ["Create the login for the other person",                 "useradd -m -s /bin/bash guest"],
+  ["Give guest a lab password",                             "echo 'guest:Pass123' | chpasswd"],
+  ["Create your own user",                                  "useradd -m -s /bin/bash shivanshu"],
+  ["Make a private folder",                                 "mkdir /home/shivanshu/secret"],
+  ["Put a secret inside it",                                "echo 'private notes' > /home/shivanshu/secret/private.txt"],
+  ["Lock your folder: only you can enter (700)",            "chmod 700 /home/shivanshu"],
+  ["Check the lock (drwx------)",                           "ls -ld /home/shivanshu", /drwx------/],
+  ["Guest tries to list your folder: blocked",              "su - guest -c 'ls /home/shivanshu'", /Permission denied/],
+  ["Guest tries to read your secret: blocked",              "su - guest -c 'cat /home/shivanshu/secret/private.txt'", /Permission denied/],
+  ["Make a team group",                                     "groupadd team"],
+  ["Add guest to the team",                                 "usermod -aG team guest"],
+  ["Make a shared folder",                                  "mkdir /srv/share"],
+  ["Put a file in it",                                      "echo 'team runbook' > /srv/share/runbook.md"],
+  ["Give it to your user and the team group",               "chown shivanshu:team /srv/share /srv/share/runbook.md"],
+  ["Team can read, everyone else nothing (750)",            "chmod 750 /srv/share"],
+  ["Keep the file itself private to the team (640)",        "chmod 640 /srv/share/runbook.md"],
+  ["Guest reads the shared file: allowed",                  "su - guest -c 'cat /srv/share/runbook.md'", /team runbook/],
+  ["Guest tries to write there: blocked",                   "su - guest -c 'touch /srv/share/x'", /Permission denied/],
+  ["Summary: who is in the team, and how the folders look", "getent group team; ls -ld /home/shivanshu /srv/share; ls -l /srv/share"],
+];
+const HEALTHY = /(^|[\r\n])HEALTHY[\r\n]/;
+const M2 = "bash /scripts/week1-milestone.sh ";
+
+const ASSIGNMENTS = {
+  a1: {
+    name: "Assignment 1 · SSH user + folder",
+    goal: "Give another person an SSH login, and keep your own folder private from them.",
+    required: ["script"],
+    reset: [
+      "userdel -r guest; userdel guestsftp; userdel -r shivanshu; groupdel team",
+      "rm -rf /srv/share /sftp /etc/ssh/authorized_keys /etc/ssh/sshd_config.d/50-ssh-user-lab.conf /root/ssh-user-lab-keys",
+    ],
+    tabs: {
+      script: { name: "Script (fast)", steps: [
+                ["Build everything: users, locked folders, SSH login",           "bash /scripts/ssh-user-lab.sh", /Done\./],
+        ["Test it by logging in as each user (expect 15 passed)",        "bash /scripts/ssh-user-lab-verify.sh", /Result: 15 passed, 0 failed/],
+        ["Guest tries to list my folder: blocked",                       "su - guest -c 'ls /home/shivanshu'", /Permission denied/],
+        ["Guest tries to read my secret: blocked",                       "su - guest -c 'cat /home/shivanshu/secret/private.txt'", /Permission denied/],
+        ["Guest reads the one file I shared: allowed",                   "su - guest -c 'cat /home/shivanshu/secret/for-guest.txt'", /hello guest/],
+        ["Show the locks (the + means a special exception)",             "ls -ld /home/shivanshu /srv/share", /drwx--x---\+/],
+      ]},
+      hand: { name: "By hand", steps: HAND },
+      meaning: { name: "What the commands mean", cards: MEANINGS_A1 },
+    }
+  },
+
+  a2: {
+    name: "Assignment 2 · Week 1 milestone",
+    goal: "Harden SSH, run a backend under systemd, put NGINX in front with TLS, and keep it healthy with an idempotent health-check and log-rotation script.",
+    required: ["do"],
+    tabs: {
+      do: { name: "Do it", steps: [
+        ["Step 1 · Harden SSH: no root login, 3 login tries, no forwarding", M2 + "harden", /change\(s\) made/],
+        ["Step 2 · Create a backend and run it as a systemd service",        M2 + "backend", /change\(s\) made/],
+        ["Step 3 · Put NGINX in front: HTTPS (TLS) + reverse proxy",         M2 + "nginx", /change\(s\) made/],
+        ["Step 4 · Install the health-check and log-rotation script",        M2 + "maintenance", /change\(s\) made/],
+        ["See it work: an HTTPS request reaches the backend through NGINX",  "curl -ks https://localhost/", /lab-backend/],
+        ["Plain HTTP is sent to HTTPS (301 redirect)",                       "curl -sI http://localhost/ | head -3", /301/],
+        ["Run the health check (expect HEALTHY)",                            "lab-maintenance.sh check", HEALTHY],
+        ["Run everything again: 0 changes proves it is idempotent",          M2 + "all", /Done: 0 change/],
+        ["Verify every requirement (expect 0 failed)",                       M2 + "verify", /Result: \d+ passed, 0 failed/],
+      ]},
+      fix: { name: "Break & fix", steps: [
+        ["Break it: stop the backend (on a systemd machine: systemctl stop lab-backend)", "pkill -f '^/usr/bin/python3 /opt/lab-backend/app.py$'"],
+        ["The health check notices: UNHEALTHY, exit code 1",                 "lab-maintenance.sh check; echo exit=$?", /UNHEALTHY[\s\S]*exit=1/],
+        ["NGINX now answers 502 Bad Gateway",                                "curl -ks https://localhost/ | grep -o '502 Bad Gateway'", /502 Bad Gateway/],
+        ["Repair: run the backend step again",                               M2 + "backend", /backend answers/],
+        ["Healthy again",                                                    "lab-maintenance.sh check", HEALTHY],
+        ["Log rotation: make a 2 MB log, rotate it, list the result",        "head -c 2000000 /dev/zero | tr '\\0' 'x' > /var/log/lab/demo.log; lab-maintenance.sh rotate; ls -l /var/log/lab/", /demo\.log\.1\.gz/],
+      ]},
+      meaning: { name: "What it does", cards: [
+        ["SSH hardening: /etc/ssh/sshd_config.d/00-hardening.conf", [
+          ["PermitRootLogin no","nobody can SSH in directly as root"],
+          ["PasswordAuthentication no","keys only, so passwords cannot be guessed. The script keeps it ON until a key exists, so you cannot lock yourself out"],
+          ["MaxAuthTries 3","three wrong tries, then disconnected"],
+          ["LoginGraceTime 30","30 seconds to log in, then the attempt is dropped"],
+          ["ClientAliveInterval 300 / CountMax 2","dead or idle sessions are cleaned up after about 10 minutes"],
+          ["X11Forwarding / AllowTcpForwarding no","close doors you do not use"],
+          ["file name starts with 00-","sshd keeps the FIRST value it reads, and the cloud image's 50- file says PasswordAuthentication yes. A 99- file would be ignored"],
+          ["sshd -t, then reload","test the config first, reload (not restart) so your session survives"]]],
+        ["systemd unit: /etc/systemd/system/lab-backend.service", [
+          ["User=labapp","runs as an unprivileged user, never root"],
+          ["ExecStart=…","the command systemd runs"],
+          ["Restart=always  RestartSec=2","if it crashes, systemd starts it again after 2 seconds"],
+          ["ProtectSystem=strict  PrivateTmp","sandbox: it can only write to /var/log/lab"],
+          ["WantedBy=multi-user.target","systemctl enable makes it start at boot"]]],
+        ["NGINX: /etc/nginx/sites-available/lab", [
+          ["listen 80 … return 301 https://","plain HTTP is redirected to HTTPS"],
+          ["listen 443 ssl","the HTTPS door"],
+          ["ssl_certificate / ssl_certificate_key","the certificate and private key (self-signed here)"],
+          ["ssl_protocols TLSv1.2 TLSv1.3","old, weak TLS versions are refused"],
+          ["proxy_pass http://127.0.0.1:5001","hand the request to the backend. HTTPS ends at NGINX, that is TLS termination"],
+          ["proxy_set_header X-Forwarded-Proto","tells the backend the visitor really used https"],
+          ["server_tokens off","do not advertise the NGINX version"],
+          ["nginx -t, then reload","test the config before applying it"]]],
+        ["lab-maintenance.sh (the idempotent script)", [
+          ["set -euo pipefail","stop at the first error instead of carrying on"],
+          ["flock","only one copy can run at a time"],
+          ["exit code 0 or 1","0 = healthy, 1 = something failed. cron and monitoring read this"],
+          ["rotate only if the file is 1 MiB or bigger","nothing to do means nothing changes. That is idempotent"],
+          ["copy, then empty the file (copytruncate)","the app keeps writing to the same file it already has open"],
+          ["RETAIN=5","keep 5 old gzip copies, delete older ones"],
+          ["*/5 * * * *  (cron)","runs the check and rotation every 5 minutes"]]],
+        ["Commands used in the steps", [
+          ["curl -ks URL","-k accept the self-signed certificate, -s no progress bar"],
+          ["curl -sI URL","-I show only the response headers"],
+          ["lab-maintenance.sh check; echo exit=$?","run the check, then print its exit code"],
+          ["pkill -f 'regex'","stop processes whose command line matches"],
+          ["head -c 2000000 /dev/zero | tr '\\0' 'x' > FILE","make a file of 2 million 'x' characters"],
+          ["bash week1-milestone.sh all  (twice)","the second run says Done: 0 change(s) made. Idempotent means safe to repeat"]]],
+      ]},
+      kodekloud: { name: "On KodeKloud", copyOnly: true, note: "Run these in the KodeKloud Ubuntu Playground terminal (it has real systemd). Copy each one. Get the script first: push your repo, or paste the file.", steps: [
+        ["Download the script from your GitHub repo (after you push it)", "curl -fsSL https://raw.githubusercontent.com/shr1-live/devops/main/01_Working_with_shell/labs/week1-milestone/week1-milestone.sh -o week1-milestone.sh"],
+        ["Read it before running it (it runs as root)",                    "less week1-milestone.sh"],
+        ["Run all four steps",                                            "sudo bash week1-milestone.sh all"],
+        ["Run it again: expect 0 changes",                                "sudo bash week1-milestone.sh all"],
+        ["Verify every requirement",                                      "sudo bash week1-milestone.sh verify"],
+        ["Show the backend is a systemd service",                         "systemctl status lab-backend --no-pager"],
+        ["Break it and let the script heal it",                           "sudo systemctl stop lab-backend; sudo lab-maintenance.sh check --heal"],
+        ["See the health log",                                            "tail -n 20 /var/log/lab/health.log"],
+      ]},
+    }
+  }
+};
+
+/* ============ topic practice sessions (3-6) ============
+   Every step passes only if its output matches the regex. Setup steps install tools inside the practice container. */
+const OKN = (n) => "&& echo ok-$((" + n + "))";   // prints ok-42 only when the command before it worked
+const TOPICS = {
+  t3: {
+    name: "1 · Linux (Ubuntu)",
+    goal: "Filesystem layout, users and permissions, sudo, processes, apt and health checks. Everything runs inside the practice container.",
+    required: ["practice"],
+    reset: ["userdel -r devuser; groupdel ops; rm -rf /srv/proj /etc/sudoers.d/devuser; echo reset-$((6*7))"],
+    tabs: {
+      practice: { name: "Practice", steps: [
+        ["Setup: install the tools this topic needs (about 30 seconds)", "apt-get update -qq && apt-get install -y -qq sysstat htop procps sudo >/dev/null 2>&1 " + OKN("6*7"), /ok-42/],
+        ["Which Linux is this?",                                   "head -2 /etc/os-release", /Ubuntu/],
+        ["/etc holds configuration. Look at three key files",      "ls -d /etc/passwd /etc/hosts /etc/ssh", /\/etc\/passwd/],
+        ["/var holds changing data: logs, caches, package lists",  "ls -d /var/log /var/lib /var/cache", /\/var\/log/],
+        ["/proc is a live view of the kernel (not real files)",    "head -3 /proc/meminfo", /MemTotal/],
+        ["/sys exposes hardware and devices to you",               "ls /sys/class/net", /\blo\b/],
+        ["Who am I? (uid 0 is root)",                              "id", /uid=0\(root\)/],
+        ["Users live in /etc/passwd. Show the root line",          "getent passwd root", /root:x:0:0/],
+        ["Create a user, a group, and put the user in the group",  "id devuser >/dev/null 2>&1 || useradd -m -s /bin/bash devuser; getent group ops >/dev/null || groupadd ops; usermod -aG ops devuser; id devuser", /\(devuser\).*\(ops\)/],
+        ["chown + chmod: owner devuser, group ops, mode 640",      "mkdir -p /srv/proj; echo hello > /srv/proj/a.txt; chown devuser:ops /srv/proj/a.txt; chmod 640 /srv/proj/a.txt; ls -l /srv/proj/a.txt", /-rw-r-----\s+1 devuser ops/],
+        ["Symbolic chmod: add x for owner, remove r from group",   "chmod u+x,g-r /srv/proj/a.txt; stat -c '%a %A %U:%G' /srv/proj/a.txt", /\b700 -rwx------ devuser:ops/],
+        ["sudoers: let devuser run ONE command as root, safely",   "echo 'devuser ALL=(ALL) NOPASSWD: /usr/bin/whoami' > /etc/sudoers.d/devuser; chmod 440 /etc/sudoers.d/devuser; visudo -cf /etc/sudoers.d/devuser", /parsed OK/],
+        ["Use it: devuser runs whoami as root through sudo",       "su - devuser -c 'sudo whoami'", /(^|[\r\n])root[\r\n]/],
+        ["Anything else is refused (least privilege)",             "su - devuser -c 'sudo id' 2>&1 | head -2", /not allowed|a password is required/],
+        ["Process list: PID, parent, state, name",                 "ps -eo pid,ppid,stat,comm | head -4", /PID\s+PPID\s+STAT\s+COMMAND/],
+        ["Process lifecycle: start a background job, inspect it, kill it", "sleep 300 & pid=$!; ps -p $pid -o pid,stat,comm; kill $pid", /PID\s+STAT\s+COMMAND\s*[\r\n]+\s*\d+\s+S\S*\s+sleep/],
+        ["apt: which version is installed and available?",         "apt-cache policy curl | head -3", /Installed:/],
+        ["apt: what files did a package install?",                 "dpkg -L curl | head -4", /\/usr\/bin\/curl|\/usr\/share/],
+        ["apt: count installed packages",                          "dpkg -l | grep -c '^ii'", /(^|[\r\n])\d{2,}[\r\n]/],
+        ["Disk space (df) and folder size (du)",                   "df -h / | head -2; du -sh /var/log", /Filesystem[\s\S]*\d+\S*\s+\/var\/log/],
+        ["Memory: used and free",                                  "free -m", /Mem:/],
+        ["CPU and memory over 3 seconds (vmstat)",                 "vmstat 1 3", /procs/],
+        ["Disk I/O and CPU summary (iostat)",                      "iostat | head -4", /avg-cpu/],
+        ["htop is installed (interactive, so just the version)",   "htop --version", /htop \d/],
+        ["Load average and uptime",                                "uptime", /load average/],
+        ["SSH hardening check: what will sshd really enforce?",    "ssh-keygen -A >/dev/null 2>&1; sshd -T 2>/dev/null | grep -E '^(permitrootlogin|maxauthtries|passwordauthentication)'", /maxauthtries \d/],
+      ]},
+      meaning: { name: "What the commands mean", cards: [
+        ["Filesystem layout (FHS)", [
+          ["/etc","configuration files: ssh, nginx, passwd, hosts"],
+          ["/var","data that changes: /var/log logs, /var/lib state, /var/cache"],
+          ["/proc","live kernel and process info. Read it, nothing is stored on disk"],
+          ["/sys","devices and drivers, e.g. /sys/class/net lists network cards"],
+          ["/home, /srv, /opt, /usr","user files, served data, extra software, installed programs"]]],
+        ["Users, groups, permissions", [
+          ["useradd -m -s /bin/bash u","-m make a home folder, -s set the login shell"],
+          ["groupadd g  /  usermod -aG g u","create a group, ADD u to g (-a is vital, without it u leaves other groups)"],
+          ["chown user:group file","change owner and group"],
+          ["chmod 640 file","owner 6=rw-, group 4=r--, others 0=---. r=4 w=2 x=1"],
+          ["chmod u+x,g-r file","symbolic form: u=owner g=group o=others, + add, - remove"],
+          ["ls -l","first column drwxr-x--- : d=directory, then owner, group, others"],
+          ["stat -c '%a %A %U:%G'","print mode as number, as letters, then owner:group"]]],
+        ["sudo", [
+          ["/etc/sudoers.d/name","one file per rule. Never edit /etc/sudoers directly"],
+          ["devuser ALL=(ALL) NOPASSWD: /usr/bin/whoami","user, on any host, as any user, no password, ONLY this command"],
+          ["chmod 440","sudo ignores sudoers files that others can write"],
+          ["visudo -cf file","check the syntax before you rely on it. A broken file can lock you out"]]],
+        ["Processes", [
+          ["ps -eo pid,ppid,stat,comm","-e all processes, -o choose columns. STAT: S sleeping, R running, Z zombie"],
+          ["cmd &","run in the background. $! is its PID, kill PID stops it"],
+          ["systemctl / journalctl","systemd starts, stops and logs services (see the KodeKloud tab, the container has no systemd)"]]],
+        ["apt and diagnostics", [
+          ["apt-cache policy pkg","installed version and the version apt would install"],
+          ["dpkg -l | grep '^ii'","list of fully installed packages"],
+          ["df -h  /  du -sh DIR","disk free per filesystem  /  size of a folder"],
+          ["free -m","memory in MB. Look at available, not just free"],
+          ["vmstat 1 3","3 samples, 1 second apart. r=waiting processes, si/so>0 means swapping, wa=waiting on disk"],
+          ["iostat","disk throughput and CPU split. High %iowait means a slow disk"],
+          ["sshd -T","print the settings sshd is really using, after all config files are merged"]]],
+      ]},
+      kodekloud: { name: "On KodeKloud (systemd)", copyOnly: true, note: "These need real systemd, so run them in the KodeKloud Ubuntu Playground, not here.", steps: [
+        ["Is the SSH service running?",                    "systemctl status ssh --no-pager"],
+        ["List running services",                          "systemctl list-units --type=service --state=running --no-pager | head"],
+        ["Restart a service and check it is enabled at boot", "sudo systemctl restart ssh; systemctl is-enabled ssh"],
+        ["Read a service's logs",                          "journalctl -u ssh --no-pager -n 20"],
+        ["Follow logs live (Ctrl+C to stop)",              "journalctl -u ssh -f"],
+        ["Logs since 10 minutes ago, errors only",         "journalctl --since '10 min ago' -p err --no-pager"],
+        ["Which services failed?",                         "systemctl --failed"],
+        ["Update packages",                                "sudo apt update && apt list --upgradable | head"],
+      ]},
+    }
+  },
+
+  t4: {
+    name: "2 · Bash scripting",
+    goal: "Write a defensive script, handle exit codes, pipes and redirection, process text with grep, awk, sed and jq, and schedule it with cron.",
+    required: ["practice"],
+    reset: ["cd /; rm -rf /root/practice /etc/cron.d/practice; echo reset-$((6*7))"],
+    tabs: {
+      practice: { name: "Practice", cwd: "/root/practice", steps: [
+        ["Setup: make a practice folder and install jq",         "mkdir -p /root/practice && cd /root/practice && (apt-get update -qq && apt-get install -y -qq jq >/dev/null 2>&1; true) " + OKN("6*7"), /ok-42/],
+        ["Write a script. Defensive settings on the first lines", "printf '%s\\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'name=\"${1:-world}\"' 'echo \"hello, $name\"' > hello.sh; cat hello.sh", /set -euo pipefail/],
+        ["Make it executable and run it with an argument",       "chmod +x hello.sh; ./hello.sh Madhav", /hello, Madhav/],
+        ["Run it with no argument: the default kicks in",        "./hello.sh", /hello, world/],
+        ["Exit code of a failing command (0 = ok, non-zero = error)", "ls /nonexistent 2>/dev/null; echo exit=$?", /exit=2/],
+        ["Exit code of a good command",                          "true; echo exit=$?", /exit=0/],
+        ["&& runs the next command only on success, || only on failure", "test -f hello.sh && echo found-$((1+1)) || echo missing", /found-2/],
+        ["set -e: the script stops at the first failure",        "bash -c 'set -e; false; echo NOT-REACHED'; echo code=$?", /code=1/],
+        ["set -u: using an unset variable is an error",          "bash -c 'set -u; echo \"$UNDEFINED_VAR\"'; echo code=$?", /unbound variable[\s\S]*code=1/],
+        ["set -o pipefail: a failure inside a pipe is not hidden", "bash -c 'set -o pipefail; false | cat; echo pf=$?'", /pf=1/],
+        ["Functions, a for loop and a case statement",           "bash -c 'greet(){ echo \"hi $1\"; }; for n in a b c; do greet \"$n\"; done; case x in x) echo case-matched;; esac'", /hi a[\s\S]*hi c[\s\S]*case-matched/],
+        ["Redirection: > overwrite, >> append, 2> errors only",  "echo out > o.txt; echo more >> o.txt; ls /nope 2> e.txt; cat o.txt e.txt", /out[\s\S]*more[\s\S]*No such file/],
+        ["Silence everything: send both streams to /dev/null",   "ls /nope /root >/dev/null 2>&1; echo quiet=$?", /quiet=2/],
+        ["Make sample data: a small CSV",                        "printf 'alice,30,Pune\\nbob,25,Delhi\\ncarol,35,Pune\\n' > people.csv; cat people.csv", /carol,35,Pune[\r\n]/],
+        ["grep: count and find lines",                           "grep -c Pune people.csv; grep -n bob people.csv", /(^|[\r\n])2[\r\n][\s\S]*2:bob/],
+        ["awk: add up a column",                                 "awk -F, '{s+=$2} END {print \"total age\", s}' people.csv", /total age 90/],
+        ["awk: filter rows and print one field",                 "awk -F, '$3==\"Pune\" {print $1}' people.csv", /alice[\r\n]+carol/],
+        ["sed: replace text (shows result, file unchanged)",     "sed 's/Pune/Mumbai/' people.csv", /alice,30,Mumbai/],
+        ["sed -i: edit the file in place (keeps a .bak copy)",   "sed -i.bak 's/Delhi/Goa/' people.csv; cat people.csv", /bob,25,Goa/],
+        ["Pipes: cut, sort, uniq. Count people per city",        "cut -d, -f3 people.csv | sort | uniq -c", /2 Pune/],
+        ["jq: read JSON",                                        "echo '{\"name\":\"web\",\"ports\":[80,443]}' | jq -r '.name, .ports[]'", /web[\r\n]+80[\r\n]+443/],
+        ["A real defensive script: disk check with an exit code", "printf '%s\\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'usage=$(df --output=pcent / | tail -1 | tr -dc 0-9)' 'if (( usage > 90 )); then echo \"DISK CRITICAL ${usage}%\"; exit 1; fi' 'echo \"disk ok ${usage}%\"' > check-disk.sh; bash check-disk.sh; echo exit=$?", /disk ok \d+%[\s\S]*exit=0/],
+        ["Schedule it with cron: every 5 minutes, as root",       "echo '*/5 * * * * root /root/practice/check-disk.sh >> /var/log/check-disk.log 2>&1' > /etc/cron.d/practice; awk '{print \"minute=\"$1, \"user=\"$6}' /etc/cron.d/practice", /minute=\*\/5 user=root/],
+      ]},
+      meaning: { name: "What the commands mean", cards: [
+        ["Defensive script header", [
+          ["#!/usr/bin/env bash","which program runs the file"],
+          ["set -e","stop at the first command that fails"],
+          ["set -u","using a variable that was never set is an error (catches typos)"],
+          ["set -o pipefail","a pipe fails if ANY part fails, not just the last"],
+          ["${1:-world}","first argument, or the word world if none was given"]]],
+        ["Exit codes and operators", [
+          ["$?","exit code of the last command. 0 = success, anything else = failure"],
+          ["a && b","run b only if a worked"],
+          ["a || b","run b only if a failed"],
+          ["a ; b","run b no matter what"],
+          ["exit 1","end the script and report failure to cron or CI"]]],
+        ["Redirection and pipes", [
+          [">  /  >>","write to a file, replacing it  /  appending to it"],
+          ["2> file","only error messages (stream 2) go to the file"],
+          [">/dev/null 2>&1","throw away normal output and errors"],
+          ["a | b","feed the output of a into b"]]],
+        ["Text tools", [
+          ["grep -c / -n","count matching lines / show line numbers"],
+          ["awk -F, '{s+=$2} END {print s}'","split by comma, add column 2, print at the end"],
+          ["awk -F, '$3==\"Pune\" {print $1}'","only rows where column 3 is Pune, print column 1"],
+          ["sed 's/old/new/'","replace the first old on each line"],
+          ["sed -i.bak","edit the file itself, save the original as .bak"],
+          ["cut -d, -f3","take the 3rd comma-separated column"],
+          ["sort | uniq -c","uniq only merges neighbours, so sort first. -c counts"],
+          ["jq -r '.ports[]'","read JSON. -r prints plain text without quotes"]]],
+        ["cron", [
+          ["*/5 * * * * root cmd","minute hour day-of-month month day-of-week USER command"],
+          ["*/5","every 5th minute"],
+          ["/etc/cron.d/name","system cron files include the user column, user crontabs do not"],
+          [">> log 2>&1","cron sends no terminal, so write output to a log"]]],
+      ]},
+    }
+  },
+
+  t5: {
+    name: "3 · Networking",
+    goal: "Interfaces, ports, HTTP and TLS, DNS lookups, subnets, ping and packet capture. Some steps need internet from the container.",
+    required: ["practice"],
+    reset: ["pkill -f 'http.server 8088'; grep -v myapp.local /etc/hosts > /tmp/h; cat /tmp/h > /etc/hosts; echo reset-$((6*7))"],
+    tabs: {
+      practice: { name: "Practice", steps: [
+        ["Setup: install the network tools (about 40 seconds)",  "apt-get update -qq && apt-get install -y -qq iproute2 dnsutils iputils-ping traceroute tcpdump netcat-openbsd openssl curl python3 >/dev/null 2>&1 " + OKN("6*7"), /ok-42/],
+        ["Network interfaces and their IP addresses",            "ip -br addr", /\blo\b/],
+        ["The routing table: where does traffic go?",            "ip route", /default via/],
+        ["Start a tiny web server on port 8088",                 "python3 -m http.server 8088 --bind 127.0.0.1 >/dev/null 2>&1 & sleep 1; echo started-$((6*7))", /started-42/],
+        ["Which ports are listening, and which program owns them?", "ss -tlnp | grep 8088", /LISTEN[\s\S]*8088/],
+        ["Is a port reachable? (nc -z only checks)",             "nc -zv 127.0.0.1 8088", /succeeded|open/],
+        ["A closed port fails with a non-zero exit code",        "nc -z 127.0.0.1 9999; echo code=$?", /code=1/],
+        ["Send an HTTP request, show the status line",           "curl -sI http://127.0.0.1:8088/ | head -1", /HTTP\/1\.0 200 OK/],
+        ["curl -v: see the request and response headers",        "curl -sv -o /dev/null http://127.0.0.1:8088/ 2>&1 | grep -E '^[<>]' | head -6", /> GET \/ HTTP\/1\.1/],
+        ["ping: is the host alive?",                             "ping -c 2 127.0.0.1", /2 received/],
+        ["traceroute: the hops to a destination",                "traceroute -n -m 3 127.0.0.1", /traceroute to 127\.0\.0\.1/],
+        ["Capture packets: watch one request on the wire",       "(sleep 1; curl -s http://127.0.0.1:8088/ >/dev/null) & timeout 8 tcpdump -ni lo -c 4 port 8088", /IP 127\.0\.0\.1\.\d+ > 127\.0\.0\.1\.8088/],
+        ["Local DNS: add a name to /etc/hosts",                  "grep -q myapp.local /etc/hosts || echo '127.0.0.1 myapp.local' >> /etc/hosts; getent hosts myapp.local", /127\.0\.0\.1\s{2,}myapp\.local/],
+        ["Resolver settings: which DNS server do we ask?",       "grep ^nameserver /etc/resolv.conf | head -2", /nameserver/],
+        ["DNS A record: the IP address of a name (needs internet)", "dig +short example.com", /\d+\.\d+\.\d+\.\d+/],
+        ["DNS NS records: who is authoritative?",                "dig +short NS example.com", /\b[a-z0-9-]+(\.[a-z0-9-]+)+\.\s*[\r\n]/],
+        ["Full answer with TTL (seconds a record may be cached)", "dig +noall +answer example.com A", /example\.com\.\s+\d+\s+IN\s+A/],
+        ["nslookup: the older tool, same answer",                "nslookup example.com | tail -3", /Address/],
+        ["TLS handshake: which protocol and certificate?",       "curl -sv https://example.com -o /dev/null 2>&1 | grep -E 'TLSv|subject:|expire date'", /TLSv1\.[23]/],
+        ["Read the certificate's dates with openssl",            "openssl s_client -connect example.com:443 -servername example.com </dev/null 2>/dev/null | openssl x509 -noout -dates", /notAfter/],
+        ["Subnets: how many addresses in a /24 and a /26?",      "echo $((2**(32-24))) addresses in /24, $((2**(32-26))) in /26", /256 addresses in \/24, 64 in \/26/],
+        ["Same idea with a netmask: /24 is 255.255.255.0",       "printf '%d.%d.%d.%d\\n' $(( (0xffffffff << (32-26)) >> 24 & 255 )) $(( (0xffffffff << (32-26)) >> 16 & 255 )) $(( (0xffffffff << (32-26)) >> 8 & 255 )) $(( (0xffffffff << (32-26)) & 255 ))", /255\.255\.255\.192/],
+        ["Clean up: stop the web server and confirm the port is free", "pkill -f 'http.server 8088'; sleep 1; ss -tln | grep -c 8088", /(^|[\r\n])0[\r\n]/],
+      ]},
+      meaning: { name: "What the commands mean", cards: [
+        ["Looking around", [
+          ["ip -br addr","-br is brief. Shows each interface, state and IP. lo is the loopback (127.0.0.1)"],
+          ["ip route","default via X means everything not local goes to gateway X"],
+          ["ss -tlnp","-t TCP, -l listening, -n numbers not names, -p which process"],
+          ["nc -zv host port","-z just test the connection, -v say what happened"]]],
+        ["HTTP", [
+          ["curl -sI URL","-I headers only, -s quiet"],
+          ["curl -v","> lines are what you sent, < lines are what came back"],
+          ["200 / 301 / 404 / 502","OK / moved elsewhere / not found / the proxy could not reach the backend"],
+          ["port 80 / 443","plain HTTP / HTTPS (HTTP inside TLS)"]]],
+        ["Reachability and packets", [
+          ["ping -c 2 host","send 2 echo requests. Checks the host is up, not that a service works"],
+          ["traceroute -n","list each router on the way. -n skips name lookups so it is faster"],
+          ["tcpdump -ni lo port 8088","-n no names, -i interface. Prints each packet. Flags: S=SYN, S.=SYN+ACK, P.=data, F=close"]]],
+        ["DNS", [
+          ["dig +short name","just the answer"],
+          ["A / AAAA / NS / MX / CNAME","IPv4 address / IPv6 address / name servers / mail server / alias"],
+          ["TTL in the dig answer","how many seconds resolvers may cache it. Low TTL = changes spread fast"],
+          ["/etc/hosts","checked before DNS. Your own private names"],
+          ["/etc/resolv.conf","which DNS server this machine asks"]]],
+        ["TLS and subnets", [
+          ["TLS handshake","client and server agree on a version, the server shows its certificate, keys are exchanged. Then HTTP runs inside"],
+          ["TLSv1.2 / TLSv1.3","the versions you should allow. 1.0 and 1.1 are retired"],
+          ["10.0.0.0/24","24 bits are the network, 8 bits are hosts. 2^8 = 256 addresses (254 usable)"],
+          ["/26","2^6 = 64 addresses, netmask 255.255.255.192"],
+          ["private ranges","10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16"]]],
+      ]},
+      kodekloud: { name: "On KodeKloud (firewall)", copyOnly: true, note: "Firewall rules need real privileges, so run these in the KodeKloud Ubuntu Playground. Keep SSH allowed before you enable ufw.", steps: [
+        ["Status of the firewall",                         "sudo ufw status verbose"],
+        ["Allow SSH first (never lock yourself out)",      "sudo ufw allow 22/tcp"],
+        ["Allow web traffic",                              "sudo ufw allow 80/tcp && sudo ufw allow 443/tcp"],
+        ["Turn the firewall on",                           "sudo ufw --force enable"],
+        ["Numbered rules",                                 "sudo ufw status numbered"],
+        ["Delete rule 3",                                  "sudo ufw delete 3"],
+        ["See the real iptables rules behind ufw",         "sudo iptables -S | head -20"],
+        ["What is listening on the machine?",              "sudo ss -tlnp"],
+      ]},
+    }
+  },
+
+  t6: {
+    name: "4 · NGINX",
+    goal: "Build a reverse proxy from scratch: load balancing, TLS, rate limiting, and debugging 502 and 504 errors. It runs on its own ports (8080, 8443), separate from the Week 1 milestone.",
+    required: ["practice"],
+    reset: ["ng -s stop 2>/dev/null; pkill -f 'http.server 900'; pkill -f 'socket.socket'; rm -rf /srv/nginx-lab /usr/local/bin/ng; echo reset-$((6*7))"],
+    tabs: {
+      practice: { name: "Practice", steps: [
+        ["Setup: install nginx, python3 and curl",               "apt-get update -qq && apt-get install -y -qq nginx python3 curl openssl >/dev/null 2>&1 " + OKN("6*7"), /ok-42/],
+        ["Make a lab folder and a shortcut called ng (nginx with our own config)", "mkdir -p /srv/nginx-lab/a /srv/nginx-lab/b && printf '%s\\n' '#!/bin/sh' 'exec nginx -p /srv/nginx-lab -e /srv/nginx-lab/error.log -c /srv/nginx-lab/nginx.conf \"$@\"' > /usr/local/bin/ng && chmod +x /usr/local/bin/ng " + OKN("6*7"), /ok-42/],
+        ["Start two backends: A on 9001, B on 9002",             "echo backend-A > /srv/nginx-lab/a/index.html; echo backend-B > /srv/nginx-lab/b/index.html; (cd /srv/nginx-lab/a && nohup python3 -m http.server 9001 --bind 127.0.0.1 >/dev/null 2>&1 &); (cd /srv/nginx-lab/b && nohup python3 -m http.server 9002 --bind 127.0.0.1 >/dev/null 2>&1 &); sleep 1; curl -s 127.0.0.1:9001/; curl -s 127.0.0.1:9002/", /backend-A[\s\S]*backend-B/],
+        ["Start a stuck backend on 9003 (accepts, never answers)", "nohup python3 -c \"import socket;s=socket.socket();s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind(('127.0.0.1',9003));s.listen(9);l=[s.accept() for _ in range(9)]\" >/dev/null 2>&1 & sleep 1; ss -tln | grep -c 9003", /(^|[\r\n])1[\r\n]/],
+        ["Write the nginx config (read it, every line is explained in the next tab)", "cat > /srv/nginx-lab/nginx.conf <<'EOF'\nworker_processes 1;\npid /srv/nginx-lab/nginx.pid;\nevents {}\nhttp {\n  access_log /srv/nginx-lab/access.log;\n  server_tokens off;\n  limit_req_zone $binary_remote_addr zone=lab:1m rate=2r/s;\n  upstream pool { server 127.0.0.1:9001; server 127.0.0.1:9002; }\n  server {\n    listen 8080;\n    location /health { return 200 \"ok\\n\"; }\n    location / { proxy_pass http://pool; }\n    location /api/ { limit_req zone=lab burst=1 nodelay; proxy_pass http://127.0.0.1:9001/; }\n    location /dead/ { proxy_pass http://127.0.0.1:9999/; }\n    location /slow/ { proxy_read_timeout 2s; proxy_pass http://127.0.0.1:9003/; }\n  }\n  server {\n    listen 8443 ssl;\n    ssl_certificate /srv/nginx-lab/c.pem;\n    ssl_certificate_key /srv/nginx-lab/k.pem;\n    ssl_protocols TLSv1.2 TLSv1.3;\n    location / { proxy_pass http://pool; }\n  }\n}\nEOF\nwc -l /srv/nginx-lab/nginx.conf", /\d+ \/srv\/nginx-lab\/nginx\.conf/],
+        ["Make a self-signed certificate for the TLS server",    "openssl req -x509 -nodes -newkey rsa:2048 -days 30 -keyout /srv/nginx-lab/k.pem -out /srv/nginx-lab/c.pem -subj /CN=localhost 2>/dev/null " + OKN("6*7"), /ok-42/],
+        ["Test the config BEFORE starting (always do this)",     "ng -t", /syntax is ok[\s\S]*successful/],
+        ["Start nginx",                                          "ng; sleep 1; ss -tln | grep -cE ':(8080|8443) '", /(^|[\r\n])2[\r\n]/],
+        ["A fixed answer from nginx itself",                     "curl -s localhost:8080/health", /(^|[\r\n])ok[\r\n]/],
+        ["Reverse proxy + load balancing: 4 requests alternate A and B", "for i in 1 2 3 4; do curl -s localhost:8080/; done", /backend-A[\s\S]*backend-B[\s\S]*backend-A[\s\S]*backend-B/],
+        ["The Server header hides the version (server_tokens off)", "curl -sI localhost:8080/health | grep -i '^server'", /Server: nginx[\r\n]/],
+        ["TLS termination: HTTPS to nginx, plain HTTP to the backend", "curl -ks https://localhost:8443/", /backend-[AB]/],
+        ["Which TLS version was used?",                          "curl -ksv https://localhost:8443/ -o /dev/null 2>&1 | grep -o 'TLSv1\\.[0-9]' | head -1", /TLSv1\.[23]/],
+        ["Rate limiting: 6 quick requests, the extra ones get 503", "for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w '%{http_code} ' localhost:8080/api/; done; echo", /200[\s\S]*503/],
+        ["502 Bad Gateway: the backend is not there",            "curl -s -o /dev/null -w '%{http_code}\\n' localhost:8080/dead/", /(^|[\r\n])502[\r\n]/],
+        ["Find WHY in the error log",                            "grep 'Connection refused' /srv/nginx-lab/error.log | tail -1 | grep -o 'connect() failed.*upstream'", /connect\(\) failed \(111: Connection refused\)/],
+        ["504 Gateway Timeout: the backend is too slow (waits 2 s)", "curl -s -o /dev/null -w '%{http_code}\\n' localhost:8080/slow/", /(^|[\r\n])504[\r\n]/],
+        ["The access log records every status",                  "grep '/dead/' /srv/nginx-lab/access.log | tail -1", /"GET \/dead\/ HTTP\/1\.1" 502/],
+        ["Change the config safely: reload without dropping connections", "sed -i 's/rate=2r\\/s/rate=5r\\/s/' /srv/nginx-lab/nginx.conf; ng -t && ng -s reload && echo reloaded-$((6*7))", /reloaded-42/],
+        ["Stop nginx and the backends",                          "ng -s stop; pkill -f 'http.server 900'; pkill -f 'socket.socket'; sleep 1; ss -tln | grep -cE ':(8080|9001) '", /(^|[\r\n])0[\r\n]/],
+      ]},
+      meaning: { name: "What the commands mean", cards: [
+        ["The config, line by line", [
+          ["upstream pool { server …9001; server …9002; }","a group of backends. nginx alternates between them (round robin)"],
+          ["least_conn; / ip_hash; / weight=3","other balancing: fewest active connections / same client to same backend / send more traffic to one server"],
+          ["listen 8080;","the port this server block answers on"],
+          ["location /health { return 200 \"ok\\n\"; }","nginx answers by itself, no backend. Good for load balancer health checks"],
+          ["location / { proxy_pass http://pool; }","hand the request to the upstream group. This is a reverse proxy"],
+          ["proxy_pass http://127.0.0.1:9001/;","the trailing / matters: /api/x is sent to the backend as /x"],
+          ["limit_req_zone … rate=2r/s","a shared counter per client IP: 2 requests per second allowed"],
+          ["limit_req zone=lab burst=1 nodelay","allow 1 extra request above the rate, then reject with 503"],
+          ["proxy_read_timeout 2s","wait only 2 seconds for the backend to answer, then 504"],
+          ["listen 8443 ssl; ssl_certificate …","TLS termination: nginx does the encryption, the backend gets plain HTTP"],
+          ["ssl_protocols TLSv1.2 TLSv1.3","refuse old, weak TLS versions"],
+          ["server_tokens off;","do not show the nginx version in headers and error pages"]]],
+        ["Commands", [
+          ["ng -t","nginx -t: check the config. Always before start or reload"],
+          ["ng -s reload","load the new config with no downtime. Old workers finish their requests"],
+          ["ng -s stop","stop nginx"],
+          ["curl -ks","-k accept the self-signed certificate, -s quiet"],
+          ["curl -w '%{http_code}'","print only the status code"]]],
+        ["Debugging errors", [
+          ["502 Bad Gateway","nginx reached no working backend. Is it running? Right port? See error.log: Connection refused"],
+          ["503 Service Unavailable","here: rate limit hit. Also when all upstream servers are marked down"],
+          ["504 Gateway Timeout","backend accepted the connection but answered too slowly. Raise proxy_read_timeout or fix the backend"],
+          ["error.log","the reason. access.log shows each request and its status"],
+          ["ss -tlnp","is anything listening on the backend port?"],
+          ["curl the backend directly","bypass nginx to see which side is broken"]]],
+      ]},
+    }
+  }
+};
+TOPICS.t7 = {
+  name: "5 · Interview must-knows",
+  goal: "The commands interviewers ask about most, each with a one-line reason why it matters. Runs inside the practice container.",
+  required: ["practice"],
+  reset: ["fuser -k 8099/tcp >/dev/null 2>&1; cd /; rm -rf /root/interview; echo reset-$((6*7))"],
+  tabs: {
+    practice: { name: "Practice", cwd: "/root/interview", steps: [
+      ["Setup: practice folder and tools (lsof, fuser, git, rsync)", "mkdir -p /root/interview && cd /root/interview && apt-get update -qq && apt-get install -y -qq lsof psmisc procps rsync git diffutils iproute2 curl python3 >/dev/null 2>&1 " + OKN("6*7"), /ok-42/],
+      ["★ Make a small web access log to analyse", "printf '%s\\n' '10.0.0.1 GET /home 200' '10.0.0.2 GET /home 200' '10.0.0.1 GET /api 500' '10.0.0.3 GET /api 200' '10.0.0.1 GET /login 404' '10.0.0.2 GET /api 502' '10.0.0.1 GET /home 200' '10.0.0.4 POST /api 200' > access.log; wc -l access.log", /\b8 access\.log/],
+      ["★ Top talkers: which IP sends the most requests?", "awk '{print $1}' access.log | sort | uniq -c | sort -rn | head -3", /4 10\.0\.0\.1/],
+      ["★ How many server errors (5xx)?", "awk '$4>=500' access.log | wc -l", /(^|[\r\n])2[\r\n]/],
+      ["★ Status code histogram", "awk '{print $4}' access.log | sort | uniq -c | sort -rn", /5 200/],
+      ["★ Show only the lines that are NOT 200 (grep -v)", "grep -v 200 access.log", /500[\s\S]*404[\s\S]*502/],
+      ["★ Find big files (what is eating the disk?)", "dd if=/dev/zero of=big.bin bs=1M count=3 2>/dev/null; find . -type f -size +2M", /\.\/big\.bin/],
+      ["Find recently changed files and act on them", "find . -name '*.log' -mmin -5 -exec ls -l {} \\;", /access\.log/],
+      ["xargs: turn a list into arguments", "ls *.log | xargs wc -l", /8 access\.log/],
+      ["★ tar: make an archive and list what is inside", "tar czf logs.tar.gz access.log && tar tzf logs.tar.gz", /(^|[\r\n])access\.log[\r\n]/],
+      ["Compare two files (diff)", "printf 'a\\nb\\n' > f1; printf 'a\\nc\\n' > f2; diff f1 f2", /< b[\s\S]*> c/],
+      ["★ Soft link vs hard link: create both", "cp access.log t.log; ln -sf t.log s2; ln -f t.log h2; ls -li t.log s2 h2", /s2 -> t\.log/],
+      ["★ Hard links share the same inode and count as 2 links", "stat -c '%i %h %n' t.log h2", /(\d+) 2 t\.log[\s\S]*\1 2 h2/],
+      ["★ Delete the original: the soft link breaks, the hard link survives", "rm t.log; head -1 h2; cat s2", /10\.0\.0\.1 GET \/home 200[\s\S]*No such file/],
+      ["★ Special permission bits: sticky /tmp, setuid passwd", "ls -ld /tmp; ls -l /usr/bin/passwd", /drwxrwxrwt[\s\S]*-rwsr-xr-x/],
+      ["chmod 755 vs 644 (scripts vs data files)", "touch script.sh data.txt; chmod 755 script.sh; chmod 644 data.txt; ls -l script.sh data.txt", /(-rwxr-xr-x[\s\S]*-rw-r--r--)|(-rw-r--r--[\s\S]*-rwxr-xr-x)/],
+      ["umask: the default permissions of new files", "umask; (umask 077; touch private.txt; ls -l private.txt)", /-rw-------/],
+      ["★ Signals: list them, then terminate politely with SIGTERM (15)", "kill -l | head -3; sleep 300 & p=$!; kill -15 $p; sleep 1; ps -p $p >/dev/null && echo alive || echo terminated", /SIGHUP[\s\S]*terminated/],
+      ["★ Which processes use the most memory?", "ps aux --sort=-%mem | head -3", /USER\s+PID/],
+      ["★ Start a server, then find who owns port 8099 (lsof)", "python3 -m http.server 8099 --bind 127.0.0.1 >/dev/null 2>&1 & sleep 1; lsof -i :8099 | head -3", /COMMAND[\s\S]*python3/],
+      ["★ Health-check an endpoint: status code and response time", "curl -s -o /dev/null -w '%{http_code} %{time_total}\\n' http://127.0.0.1:8099/", /200 [\d.]+/],
+      ["★ Free the port by killing whoever holds it (fuser -k)", "fuser -k 8099/tcp >/dev/null 2>&1; sleep 1; ss -tln | grep -c 8099", /(^|[\r\n])0[\r\n]/],
+      ["PATH, which and type: how the shell finds commands", "echo $PATH | tr ':' '\\n' | head -3; which ls; type cd", /\/usr\/(local\/)?s?bin[\s\S]*cd is a shell builtin/],
+      ["★ Environment variables: exported vs not", "export APP_ENV=prod; bash -c 'echo env=$APP_ENV'; APP_ENV=x bash -c 'echo env=$APP_ENV'", /env=prod[\s\S]*env=x/],
+      ["★ Which folder is biggest? (du + sort -rh)", "du -ah /var 2>/dev/null | sort -rh | head -3", /\d\S*\s+\/var/],
+      ["★ Disk is 'full' but df -h shows space? Check inodes", "df -i / | head -2", /Inodes/],
+      ["Which package owns this file?", "dpkg -S /usr/bin/curl", /(^|[\r\n])curl: \/usr\/bin\/curl/],
+      ["Kernel and CPU facts", "uname -srm; nproc", /Linux/],
+      ["★ Git: init a repo and make the first commit", "cd /root/interview && rm -rf demo && git init -q demo && cd demo && git config user.email a@b.c && git config user.name me && echo hi > f && git add f && git commit -qm first && git log --oneline", /[0-9a-f]{7} .*first/],
+      ["★ Git: branch, change, and see the history graph", "cd /root/interview/demo && git checkout -qb feature; echo more >> f; git commit -qam change; git log --oneline --graph --all | head -3", /[0-9a-f]{7} .*change/],
+    ]},
+    qa: { name: "Interview Q&A", cards: [
+      ["Hard link vs soft (symbolic) link?", [["Short answer","Hard link = another name for the same inode, survives deleting the original, cannot cross filesystems or point to folders. Soft link = a small file holding a path, breaks if the target is deleted."]]],
+      ["kill vs kill -9?", [["Short answer","kill (SIGTERM 15) asks the process to clean up and exit. kill -9 (SIGKILL) is forced by the kernel, cannot be caught, no cleanup. Try 15 first."]]],
+      ["Disk shows free space but you cannot create files?", [["Short answer","Out of inodes (df -i), or a quota, or a read-only mount. Many tiny files use up inodes."]]],
+      ["What is load average?", [["Short answer","Average number of processes running or waiting for CPU over 1, 5, 15 minutes. Compare it to the CPU count (nproc). Load above the core count means a queue."]]],
+      ["What do chmod 755 and 644 mean?", [["Short answer","755 = owner rwx, others r-x (programs, folders). 644 = owner rw-, others r-- (normal files). r=4 w=2 x=1."]]],
+      ["What are setuid and the sticky bit?", [["Short answer","setuid (s in rwsr-xr-x): runs with the file owner's rights, like passwd. Sticky (t in drwxrwxrwt): in /tmp, users can only delete their own files."]]],
+      ["502 vs 503 vs 504?", [["Short answer","502 proxy got a bad answer or none (backend down). 503 service unavailable or rate limited. 504 backend too slow, proxy timed out."]]],
+      ["What happens when you type curl https://example.com?", [["Short answer","DNS lookup, TCP handshake, TLS handshake (certificate check), HTTP request, response, connection close."]]],
+      ["What does idempotent mean for scripts?", [["Short answer","Running it twice gives the same result as once. Check before you change: mkdir -p, grep -q || append, compare file content before writing."]]],
+      ["What does set -euo pipefail do?", [["Short answer","-e stop on error, -u error on unset variables, -o pipefail a pipe fails if any part fails. Makes scripts fail loudly instead of silently."]]],
+      ["Process vs thread?", [["Short answer","A process has its own memory. Threads share the memory of their process, so they are lighter but need locking."]]],
+      ["What is a zombie process?", [["Short answer","A finished child whose parent has not read its exit status yet. It uses no CPU. Fix the parent or kill the parent."]]],
+      ["Reverse proxy vs load balancer?", [["Short answer","A reverse proxy sits in front of servers (TLS, caching, routing). A load balancer spreads requests across several servers. nginx can do both."]]],
+      ["Container vs VM?", [["Short answer","A VM runs its own kernel on virtual hardware. A container shares the host kernel and isolates processes with namespaces and cgroups. Lighter and faster to start."]]],
+      ["Git merge vs rebase?", [["Short answer","Merge keeps history and adds a merge commit. Rebase replays your commits on top, giving a straight history. Never rebase shared branches."]]],
+      ["A service will not start. What do you check?", [["Short answer","systemctl status NAME, journalctl -u NAME -n 50, config test (nginx -t, sshd -t), port in use (ss -tlnp), permissions, disk space (df -h)."]]],
+    ]},
+    kodekloud: { name: "On KodeKloud (systemd, Docker)", copyOnly: true, note: "These need real systemd, Docker or a cluster. Run them in a KodeKloud playground. All are common interview commands.", steps: [
+      ["★ Service status, start, enable at boot", "systemctl status nginx --no-pager; sudo systemctl enable --now nginx"],
+      ["★ Why did it fail? Logs for one service", "journalctl -u nginx -n 50 --no-pager"],
+      ["★ Follow logs live (Ctrl+C to stop)", "journalctl -u nginx -f"],
+      ["★ SSH tunnel: reach a remote port locally", "ssh -L 8080:localhost:80 user@server"],
+      ["★ Copy files over SSH and sync folders", "scp file.txt user@server:/tmp/; rsync -avz ./dir/ user@server:/tmp/dir/"],
+      ["★ Docker: run, list, logs, shell inside", "docker run -d --name web -p 8080:80 nginx; docker ps; docker logs web; docker exec -it web sh"],
+      ["★ Docker: clean up", "docker rm -f web; docker system prune -f"],
+      ["★ Kubernetes: what is running, why is it broken", "kubectl get pods -A; kubectl describe pod NAME; kubectl logs NAME --previous"],
+      ["★ Kubernetes: apply, scale, roll back", "kubectl apply -f app.yaml; kubectl scale deploy app --replicas=3; kubectl rollout undo deploy app"],
+      ["★ Terraform: the safe loop", "terraform init; terraform plan; terraform apply"],
+    ]},
+  }
+};
+
+{ const old = { ...ASSIGNMENTS }; for (const k in old) delete ASSIGNMENTS[k]; Object.assign(ASSIGNMENTS, TOPICS, old); }  // topics first, assignments last
+
+/* ============ "what this command does", shown right under each step while it runs ============ */
+const EXPLAIN = {
+  "a1.script": [
+    "Runs a script that creates the users, locks the folders and sets up the SSH login. Same commands as the By hand tab.",
+    "Logs in as each user for real and checks 15 rules. Each line says PASS or FAIL.",
+    "su - guest -c 'CMD' = run CMD as the user guest. ls lists the folder. Blocked because the folder is mode 700.",
+    "cat prints a file. It fails because guest cannot even enter the parent folder.",
+    "Works because an ACL (special rule) gives guest read access to this one file and search access to the folders above it.",
+    "ls -l long format, -d show the folder itself. drwx--x---+ : owner full, group may enter, others nothing, + means an ACL exists.",
+  ],
+  "a1.hand": [
+    "useradd creates the account. -m makes a home folder, -s sets the login shell.",
+    "chpasswd reads user:password pairs. This sets guest's password for the lab.",
+    "Your own user. Its home folder is what we will protect.",
+    "mkdir makes a folder inside your home.",
+    "echo 'text' > file writes text into a file (> replaces the file).",
+    "chmod 700 = owner rwx, group ---, others ---. Nobody else can enter.",
+    "ls -ld shows the folder's own permissions. drwx------ proves only the owner has access.",
+    "su - guest -c 'ls …' runs the command as guest. Permission denied is the goal.",
+    "Same idea: guest cannot read a file inside a folder it cannot enter.",
+    "groupadd creates a group. Groups let you give access to several people at once.",
+    "usermod -aG team guest: -G group, -a ADD (without -a guest would leave all other groups).",
+    "A folder outside your home, for sharing.",
+    "A file for the team to read.",
+    "chown user:group sets the owner and the group of both items.",
+    "750 = owner rwx, group r-x, others ---. Group can enter and read, not write.",
+    "640 = owner rw-, group r--, others ---. Group can read the file only.",
+    "guest is in team, so group permissions apply: reading works.",
+    "Group has no w, so writing is refused. Least privilege.",
+    "getent group team shows members. ls -l shows the final permissions.",
+  ],
+  "a2.do": [
+    "Writes /etc/ssh/sshd_config.d/00-hardening.conf, tests it with sshd -t, then reloads sshd (reload keeps your session alive).",
+    "Creates a system user labapp, a small Python backend on 127.0.0.1:5001 and a systemd unit (Restart=always). Without systemd it starts it directly.",
+    "Installs nginx, makes a self-signed certificate, writes a server block: 443 with TLS, proxy_pass to the backend, port 80 redirects.",
+    "Installs lab-maintenance.sh (health check + log rotation) and a cron entry that runs it every 5 minutes.",
+    "curl -k accepts the self-signed certificate, -s is quiet. The answer comes from the backend through nginx.",
+    "curl -I shows headers only. 301 + Location: https://… means HTTP is redirected to HTTPS.",
+    "Checks service, backend, proxy, disk and certificate. Prints HEALTHY and exits 0, or UNHEALTHY and exits 1.",
+    "Idempotent = safe to repeat. Every step checks first, so nothing changes the second time: Done: 0 change(s).",
+    "Checks every requirement (SSH, backend, TLS, redirect, cron, rotation) and counts PASS and FAIL.",
+  ],
+  "a2.fix": [
+    "pkill -f stops the process whose command line matches. Simulates a crash. (With systemd you would use systemctl stop.)",
+    "check; echo exit=$? prints the script's exit code. 1 means unhealthy, which cron or monitoring would alert on.",
+    "nginx is fine but the backend behind it is gone: 502 Bad Gateway.",
+    "Running the step again recreates and starts the backend. Idempotent steps are safe to re-run.",
+    "Check again: HEALTHY, exit 0.",
+    "head -c makes a 2 MB file. rotate copies it to demo.log.1.gz, then empties the original (copytruncate).",
+  ],
+  "t3.practice": [
+    "apt-get update refreshes the package list, install adds tools. >/dev/null hides the noise. && echo ok-42 only prints if all worked.",
+    "head -2 shows the first 2 lines of /etc/os-release, which describes the distribution.",
+    "ls -d lists the folders/files themselves. /etc is where configuration lives.",
+    "/var/log logs, /var/lib program state, /var/cache caches.",
+    "/proc is not on disk. The kernel creates it live. meminfo lists memory.",
+    "/sys shows devices. /sys/class/net has one entry per network card; lo is the loopback.",
+    "id prints your user id, group id and groups. uid 0 is root.",
+    "getent reads the user database. Fields: name:x:uid:gid:comment:home:shell.",
+    "useradd -m -s creates the user, groupadd the group, usermod -aG adds the user to it (-a = append), id shows the result. || and the check make it safe to repeat.",
+    "chown devuser:ops sets owner:group. chmod 640 = owner rw-, group r--, others none. ls -l shows -rw-r-----.",
+    "u=owner g=group. u+x adds execute for the owner, g-r removes read from the group. stat -c prints mode as number, letters and owner:group.",
+    "A file in /etc/sudoers.d allows ONE command without a password. chmod 440 makes it safe. visudo -cf checks the syntax.",
+    "su - devuser -c switches to devuser. sudo whoami runs as root, so it prints root.",
+    "Any other command is not in the rule, so sudo refuses. 2>&1 shows the error text too.",
+    "ps -e all processes, -o picks columns: pid, parent pid, state, name. head -4 keeps four lines.",
+    "cmd & runs in the background; $! is its PID. ps -p inspects it (S = sleeping). kill ends it.",
+    "apt-cache policy shows installed and candidate versions.",
+    "dpkg -L lists the files a package installed.",
+    "dpkg -l lists packages; ^ii = installed. grep -c counts the lines.",
+    "df -h free space (human sizes). du -sh total size of a folder.",
+    "free -m memory in MB. Check the available column.",
+    "vmstat 1 3 = 3 reports, 1 second apart. r runnable, si/so swap, wa waiting for disk.",
+    "iostat shows CPU split and disk throughput. High %iowait means a slow disk.",
+    "htop is an interactive monitor. --version just proves it is installed.",
+    "Load average = average number of processes wanting CPU over 1, 5, 15 minutes.",
+    "ssh-keygen -A makes missing host keys. sshd -T prints the settings sshd really uses; grep keeps three.",
+  ],
+  "t4.practice": [
+    "mkdir -p makes the folder (no error if it exists). cd moves into it. jq is installed for the JSON step.",
+    "printf '%s\\n' prints each argument on its own line into hello.sh. Line 2 is the defensive header. ${1:-world} = first argument or 'world'.",
+    "chmod +x makes the file runnable. ./hello.sh Madhav passes Madhav as $1.",
+    "No argument, so ${1:-world} falls back to world.",
+    "ls fails (nothing there). $? holds the last exit code: 0 ok, non-zero error. 2>/dev/null hides the error text.",
+    "true always succeeds, so $? is 0.",
+    "test -f checks the file exists. && runs the next command on success, || on failure.",
+    "set -e stops a script at the first failing command. false fails, so NOT-REACHED never prints. bash -c runs a mini script.",
+    "set -u makes an unset variable an error (catches typos) instead of silently empty.",
+    "Normally a pipe's exit code is the LAST command's. pipefail makes it fail if any part fails.",
+    "greet(){ …; } defines a function. for loops over a list. case matches patterns.",
+    "> replaces a file, >> appends, 2> sends only errors. cat prints both files.",
+    ">/dev/null throws output away, 2>&1 sends errors to the same place. $? is still 2 because ls /nope failed.",
+    "printf with \\n writes 3 lines of name,age,city into people.csv. cat shows them.",
+    "grep -c counts matching lines. grep -n shows the line number.",
+    "awk -F, splits on commas. {s+=$2} adds column 2 for each line. END runs once at the end.",
+    "A pattern before the braces filters rows: only lines where column 3 is Pune. Print column 1.",
+    "sed 's/old/new/' replaces text and prints. The file itself is not changed.",
+    "sed -i edits the file itself. -i.bak keeps the original as people.csv.bak.",
+    "cut -d, -f3 takes column 3. sort groups equal lines. uniq -c counts them (uniq only merges neighbours).",
+    "jq reads JSON. -r prints raw text. .name picks a field, .ports[] unrolls the array.",
+    "Defensive script: df gets disk use, tr keeps the digits, (( )) compares numbers, exit 1 reports failure. Exit 0 = healthy.",
+    "Cron fields: minute hour day month weekday user command. */5 = every 5 minutes. awk just reads two fields back.",
+  ],
+  "t5.practice": [
+    "Installs ip, dig, ping, traceroute, tcpdump, nc, openssl and python3. && echo ok-42 only prints if it worked.",
+    "ip -br addr: -br = brief. One line per interface with state and IP. lo is the loopback 127.0.0.1.",
+    "default via X: everything that is not local is sent to gateway X.",
+    "python3 -m http.server is a built-in web server. & runs it in the background. --bind 127.0.0.1 = only this machine.",
+    "ss -tlnp: -t TCP, -l listening, -n numbers, -p owning process. grep 8088 picks our server.",
+    "nc -zv: -z only test the connection (send no data), -v say the result.",
+    "A closed port makes nc exit with 1. $? shows it.",
+    "curl -s quiet, -I headers only. HTTP/1.0 200 OK is the status line.",
+    "curl -v prints > lines (what we sent) and < lines (what came back). grep keeps those lines.",
+    "ping -c 2 sends 2 echo requests. '2 received' means the host answered. Checks the host, not a service.",
+    "traceroute -n lists each router on the path (-n skips name lookups). -m 3 = at most 3 hops.",
+    "tcpdump -ni lo port 8088 prints packets on the loopback. -c 4 stops after 4. A curl in the background creates the traffic.",
+    "/etc/hosts is read before DNS. A line is: IP name. getent hosts resolves the way programs do.",
+    "/etc/resolv.conf lists the DNS servers this machine asks.",
+    "dig +short prints just the answer. A record = IPv4 address of the name.",
+    "NS records list the name servers that are authoritative for the domain.",
+    "+noall +answer shows the answer section only. The number is the TTL: seconds the answer may be cached.",
+    "nslookup is the older tool. The Address line is the answer.",
+    "curl -v on https shows the TLS handshake. TLSv1.3 is the version, subject and expire date come from the server certificate.",
+    "s_client opens a TLS connection. x509 -noout -dates prints notBefore and notAfter (certificate validity).",
+    "/24 means 24 network bits, 8 host bits: 2^8 = 256 addresses. /26: 2^6 = 64. $(( )) is bash arithmetic.",
+    "Shifts bits to build the netmask: a /26 has 26 ones = 255.255.255.192. Same idea for any CIDR.",
+    "pkill -f stops the server. grep -c 8088 counts listeners: 0 means the port is free.",
+  ],
+  "t6.practice": [
+    "Installs nginx (web server and reverse proxy), python3 (for test backends), curl and openssl.",
+    "ng is a tiny shortcut for: nginx -p (folder) -e (error log) -c (our config). Keeps this lab separate from any other nginx.",
+    "Two web servers on ports 9001 and 9002, each serving a different word. (cd …&) runs each from its own folder, in the background.",
+    "A server that accepts connections and never answers, to cause a 504 later. ss | grep -c 9003 should print 1.",
+    "A heredoc (<<'EOF') writes many lines into a file. Upstream = the backend pool, location = URL routing, listen = port. Full line-by-line meaning is in the next tab.",
+    "openssl req -x509 -nodes makes a certificate and key without a passphrase. -subj sets the name. Self-signed = browsers will warn, fine for a lab.",
+    "nginx -t only checks the config. Always run it before start or reload.",
+    "Starts nginx. ss -tln lists listening ports; grep -c counts our two.",
+    "location /health returns text straight from nginx, no backend involved. Used by load balancers.",
+    "proxy_pass http://pool sends each request to the next backend in turn (round robin): A, B, A, B.",
+    "server_tokens off hides the nginx version number. grep -i ignores case.",
+    "nginx handles TLS on 8443 and talks plain HTTP to the backend. -k accepts the self-signed certificate.",
+    "-v prints the handshake. grep -o keeps only the matched TLS version.",
+    "limit_req allows 2 requests/second with 1 extra (burst). curl -w prints just the status code. Extra requests get 503.",
+    "Nothing listens on port 9999, so nginx cannot connect: 502 Bad Gateway.",
+    "error.log says why: connect() failed (111: Connection refused) while connecting to upstream.",
+    "The backend accepts but never replies. After proxy_read_timeout (2s) nginx gives up: 504 Gateway Timeout.",
+    "access.log records every request with its status code, here 502.",
+    "sed -i edits the config (rate 2r/s to 5r/s). ng -t checks, ng -s reload applies it with no downtime.",
+    "ng -s stop stops nginx. pkill stops the backends. Port check should print 0.",
+  ],
+};
+
+EXPLAIN["t7.practice"] = [
+  "Makes /root/interview and installs lsof, fuser (psmisc), git and more. && echo ok-42 only prints if all worked.",
+  "Interview: log analysis is asked a lot. printf writes 8 lines of IP, method, path, status. wc -l counts lines.",
+  "Interview classic. awk takes column 1 (IP), sort groups, uniq -c counts, sort -rn biggest first, head -3 top three. uniq only merges neighbours, so sort first.",
+  "awk '$4>=500' keeps lines where column 4 (status) is 500 or more. wc -l counts them. Use it to measure error rate.",
+  "Same pipeline on the status column: how many 200, 404, 500. First thing to check in an incident.",
+  "grep -v inverts the match: everything that is NOT 200. Also useful: grep -i (ignore case), -r (recursive), -c (count).",
+  "dd makes a 3 MB file. find -size +2M lists files bigger than 2 MB. Interview: 'disk is full, how do you find the culprit?'",
+  "find -mmin -5 = changed in the last 5 minutes. -exec runs a command on each hit. {} is the file, \\; ends the command.",
+  "xargs builds a command from piped lines: ls *.log | xargs wc -l runs wc -l on each name. Use find -print0 | xargs -0 for odd file names.",
+  "tar c create, z gzip, f file. tzf lists the archive without extracting. x extracts: tar xzf logs.tar.gz.",
+  "diff shows the difference. < is from the first file, > from the second. Used for config drift checks.",
+  "ln -s makes a soft link (stores a path). ln makes a hard link (another name for the same data). ls -i shows inode numbers.",
+  "stat -c '%i %h %n' prints inode, link count, name. Same inode + link count 2 = one file with two names.",
+  "After rm the hard link h2 still reads fine (data lives until the last name is gone). The soft link s2 points at nothing: No such file.",
+  "t in drwxrwxrwt = sticky bit: in /tmp you can delete only your own files. s in -rwsr-xr-x = setuid: passwd runs as root so users can change their password.",
+  "755 = rwxr-xr-x (programs, folders). 644 = rw-r--r-- (normal files). r=4 w=2 x=1, add them up.",
+  "umask removes bits from new files. umask 077 means new files are private (600). Default is usually 022, files get 644.",
+  "kill -l lists signals. kill -15 (SIGTERM) asks politely and lets the program clean up. kill -9 (SIGKILL) cannot be caught. $! is the PID of the last background job.",
+  "ps aux lists all processes. --sort=-%mem sorts by memory, biggest first. Use -%cpu for CPU. First look when a server is slow.",
+  "python3 -m http.server starts a test server. lsof -i :8099 shows which process owns that port. Interview: 'address already in use, what now?'",
+  "curl -s quiet, -o /dev/null drops the body, -w prints a format: HTTP status and total time. The classic health check.",
+  "fuser -k 8099/tcp kills whatever holds the port. Then ss -tln | grep -c 8099 should say 0. Alternative: kill $(lsof -t -i :8099).",
+  "$PATH is where the shell searches for programs. which shows the file. type also knows builtins like cd (no file).",
+  "export puts a variable into child processes. VAR=x cmd sets it for that one command only.",
+  "du -ah lists sizes of everything, sort -rh sorts human sizes biggest first. Interview: 'find what fills /var'.",
+  "df -i shows inodes. A disk can be 'full' with space left if all inodes are used (millions of tiny files).",
+  "dpkg -S FILE says which package installed it. dpkg -L PKG lists a package's files.",
+  "uname -srm kernel name, release, machine. nproc number of CPU cores (compare with load average).",
+  "git init creates a repo, add stages, commit saves a snapshot, log --oneline shows history.",
+  "checkout -b makes a branch. log --graph --all draws all branches. Interview: merge vs rebase (see the Q&A tab).",
+];
+
+/* ============ saved progress (survives refresh; fine if storage is blocked) ============ */
+let saved = { state: {}, completed: {} };
+try { saved = Object.assign(saved, JSON.parse(localStorage.getItem("devopslab.v4") || "{}")); } catch (e) {}
+const persist = () => { try { localStorage.setItem("devopslab.v4", JSON.stringify(saved)); } catch (e) {} };
+
+const failOut = {};
+let curA = Object.keys(ASSIGNMENTS)[0], curT = Object.keys(ASSIGNMENTS[curA].tabs)[0], busy = false, stopFlag = false;
+const T = () => ASSIGNMENTS[curA].tabs[curT];
+const key = (a, t) => a + "." + t;
+function states(a = curA, t = curT) {
+  const tab = ASSIGNMENTS[a].tabs[t], k = key(a, t), len = (tab.steps || []).length;
+  let s = saved.state[k];
+  if (!Array.isArray(s) || s.length !== len) s = saved.state[k] = new Array(len).fill("");
+  s.forEach((v, i) => { if (v === "running") s[i] = ""; });
+  return s;
+}
+const requiredDone = (a) => ASSIGNMENTS[a].required.every(t => states(a, t).length && states(a, t).every(v => v === "done"));
+
+/* ============ terminal (ttyd websocket) ============ */
+const enc = new TextEncoder(), dec = new TextDecoder();
+const dot = document.getElementById("dot"), statusEl = document.getElementById("status");
+const term = new Terminal({ fontSize: 14, cursorBlink: false, scrollback: 5000,
+  fontFamily: 'ui-monospace, Consolas, "Liberation Mono", monospace', theme: { background: "#0b0f14", foreground: "#e6edf3" } });
+const fit = new FitAddon.FitAddon();
+term.loadAddon(fit); term.open(document.getElementById("term"));
+let ws = null, retry = null, lastOut = 0, tail = "", cap = null;
+const send = (p, s) => { if (ws && ws.readyState === 1) ws.send(enc.encode(p + s)); };
+const show = (on, t) => { dot.classList.toggle("on", on); statusEl.textContent = t; };
+const clean = s => s.replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b\][^\x07]*\x07/g, "");
+
+let raf = 0;   // refit only when the box really changed size (a resize loop is what makes a terminal flicker)
+new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
+  const d = fit.proposeDimensions();
+  if (!d || !d.cols || !d.rows || (d.cols === term.cols && d.rows === term.rows)) return;
+  term.resize(d.cols, d.rows); send("1", JSON.stringify({ columns: d.cols, rows: d.rows }));
+}); }).observe(document.getElementById("term"));
+
+function connect() {
+  clearTimeout(retry);
+  const sock = new WebSocket("ws://localhost:7683/ws", ["tty"]);      // the terminal always runs on this PC
+  ws = sock; sock.binaryType = "arraybuffer";
+  sock.onopen = () => {
+    const d = fit.proposeDimensions(); if (d && d.cols && d.rows) term.resize(d.cols, d.rows);
+    sock.send(enc.encode(JSON.stringify({ AuthToken: "", columns: term.cols, rows: term.rows })));
+    show(true, "Connected"); term.focus();
+  };
+  sock.onmessage = (e) => {
+    const d = new Uint8Array(e.data); if (!d.length || d[0] !== 48) return;
+    term.write(d.subarray(1)); lastOut = performance.now();
+    const txt = clean(dec.decode(d.subarray(1), { stream: true }));
+    tail = (tail + txt).slice(-300); if (cap !== null) cap += txt;
+  };
+  sock.onclose = () => { if (ws === sock) { show(false, "Not connected, retrying…"); retry = setTimeout(connect, 3000); } };
+}
+term.onData(d => { if (!busy) send("0", d); });   // typing is paused while steps run, so nothing breaks the flow
+document.getElementById("clear").onclick = () => { term.clear(); send("0", "clear\n"); term.focus(); };
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+/* A command is finished when output has gone quiet and the shell prompt ("# ") is back. Returns everything it printed. */
+async function runCommand(cmd) {
+  tail = ""; cap = ""; lastOut = performance.now();
+  send("0", cmd + "\n"); await sleep(300);
+  for (;;) {
+    const quiet = performance.now() - lastOut;
+    if ((quiet > 500 && /[#$] $/.test(tail)) || quiet > 240000 || !ws || ws.readyState !== 1) break;
+    await sleep(100);
+  }
+  const out = cap; cap = null; return out;
+}
+
+/* ============ rendering ============ */
+const $ = id => document.getElementById(id);
+const mk = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+function render() {
+  const A = ASSIGNMENTS[curA], tab = T(), st = tab.cards ? [] : states();
+  const navItems = [];
+  Object.entries(ASSIGNMENTS).forEach(([k, v], idx) => {
+    if (idx === 0) navItems.push(mk("h2", "", "Practice topics"));
+    if (k[0] === "a" && (idx === 0 || ASSIGNMENTS[Object.keys(ASSIGNMENTS)[idx - 1]] && Object.keys(ASSIGNMENTS)[idx - 1][0] !== "a")) navItems.push(mk("h2", "", "Assignments"));
+    const b = mk("button", "chip" + (k === curA ? " on" : ""), v.name);
+    if (saved.completed[k]) b.append(mk("span", "tick", "✓"));
+    b.disabled = busy; b.onclick = () => { curA = k; curT = Object.keys(ASSIGNMENTS[k].tabs)[0]; setNav(false); render(); }; navItems.push(b);
+  });
+  $("assign").replaceChildren(...navItems);
+  $("cur").textContent = A.name + (saved.completed[curA] ? "  ✓" : "");
+  $("goal").textContent = A.goal;
+  $("tabs").replaceChildren(...Object.entries(A.tabs).map(([k, v]) => {
+    const b = mk("button", "tab" + (k === curT ? " on" : ""), v.name); b.disabled = busy; b.onclick = () => { curT = k; render(); }; return b;
+  }));
+
+  const runnable = !tab.cards && !tab.copyOnly;
+  $("bar").style.display = runnable ? "" : "none";
+  $("reset").style.display = A.reset ? "" : "none";
+  $("complete").style.display = A.required.includes(curT) ? "" : "none";
+
+  const ol = $("steps"), keep = ol.scrollTop;
+  if (tab.cards) {
+    ol.replaceChildren(...tab.cards.map(([title, parts]) => {
+      const c = mk("div", "m"); c.append(mk("code", "", title));
+      for (const [p, m] of parts) { const r = mk("div", "row"); r.append(mk("span", "part", p), mk("span", "mean", m)); c.append(r); }
+      return c;
+    }));
+    return;
+  }
+  ol.replaceChildren();
+  if (tab.note) ol.append(mk("p", "note", tab.note));
+  tab.steps.forEach(([desc, cmd], i) => {
+    const li = mk("li", st[i] || ""); li.id = "s" + i;
+    const s = mk("span", "st", st[i] === "done" ? "✓" : st[i] === "fail" ? "✗" : st[i] === "running" ? "▶" : String(i + 1));
+    const mid = mk("div"); mid.append(mk("div", "desc", desc), mk("code", "", cmd));
+    const why = (EXPLAIN[curA + "." + curT] || [])[i]; if (why) mid.append(mk("div", "why", why));
+    const fo = failOut[curA + "." + curT + "." + i]; if (st[i] === "fail" && fo) mid.append(mk("code", "failout", "Got:\n" + fo));
+    const btn = mk("button", "go", tab.copyOnly ? "Copy" : "▶");
+    btn.title = tab.copyOnly ? "Copy this command" : "Run only this step"; btn.disabled = busy && !tab.copyOnly;
+    btn.onclick = tab.copyOnly ? () => copy(cmd, btn) : () => runSteps([i]);
+    li.append(s, mid, btn); ol.append(li);
+  });
+  ol.scrollTop = keep;
+
+  const done = st.filter(v => v === "done").length, bad = st.filter(v => v === "fail").length;
+  if (runnable) {
+    $("count").textContent = catchMsg || (done + " of " + st.length + " done" + (bad ? ", " + bad + " failed" : ""));
+    const ra = $("runall"); ra.textContent = busy ? "■ Stop" : "▶ Run all, one by one"; ra.classList.toggle("stop", busy);
+    $("reset").disabled = busy; $("clearticks").disabled = busy;
+  }
+  const c = $("complete"), isDone = !!saved.completed[curA], ready = requiredDone(curA);
+  c.className = "complete" + (isDone ? " done" : "");
+  c.replaceChildren();
+  const msg = mk("span", "msg", isDone ? "✓ Assignment complete (" + saved.completed[curA] + ")"
+    : ready ? "All required steps passed." : "Finish every step in “" + A.tabs[A.required[0]].name + "” to complete this assignment.");
+  const b = mk("button", isDone ? "" : "ok", isDone ? "Undo" : "✓ Mark assignment complete");
+  b.disabled = !isDone && !ready;
+  b.onclick = () => { if (isDone) delete saved.completed[curA]; else saved.completed[curA] = new Date().toLocaleDateString(); persist(); render(); };
+  c.append(msg, b);
+}
+
+function copy(text, btn) {
+  const ok = () => { const t = btn.textContent; btn.textContent = "Copied"; setTimeout(() => btn.textContent = t, 1200); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(ok, () => fb(text, ok)); else fb(text, ok);
+}
+function fb(text, ok) { const ta = document.createElement("textarea"); ta.style.cssText = "position:fixed;opacity:0"; ta.value = text; document.body.append(ta); ta.select(); try { document.execCommand("copy"); ok(); } catch (e) {} ta.remove(); }
+
+function ready() {
+  if (ws && ws.readyState === 1) return true;
+  alert("The terminal is not connected yet. Start it with ssh-lab.cmd in D:\\Devops and wait a few seconds."); return false;
+}
+
+let catchMsg = "";
+/* Run steps one by one. If you jump to a later step, every earlier step that is not done yet runs first (catch-up),
+   because later steps depend on earlier ones. A tab can also say it needs another tab finished first (needs). */
+async function runSteps(indexes) {
+  if (busy || !ready()) return;
+  busy = true; stopFlag = false;
+  const a = curA, t0 = curT, tab0 = T();
+  if (indexes.length > 1) { states(a, t0).fill(""); delete saved.completed[a]; }
+  const seq = [];
+  const need = tab0.needs;
+  if (need && indexes.length === 1) ASSIGNMENTS[a].tabs[need].steps.forEach((_, j) => { if (states(a, need)[j] !== "done") seq.push([need, j]); });
+  const st0 = states(a, t0);
+  if (indexes.length === 1) for (let j = 0; j < indexes[0]; j++) if (st0[j] !== "done") seq.push([t0, j]);
+  const prereq = seq.length;
+  indexes.forEach(i => seq.push([t0, i]));
+  let n = 0;
+  for (const [t, i] of seq) {
+    if (stopFlag || !ws || ws.readyState !== 1) break;
+    const steps = ASSIGNMENTS[a].tabs[t].steps, st = states(a, t), cwd = ASSIGNMENTS[a].tabs[t].cwd;
+    catchMsg = n < prereq ? "Catching up step " + (i + 1) + " first…" : "";
+    st[i] = "running"; if (t === curT) { render(); document.getElementById("s" + i)?.scrollIntoView({ block: "nearest" }); }
+    const out = await runCommand((cwd ? "cd " + cwd + " 2>/dev/null; " : "") + steps[i][1]);
+    const bad = steps[i][2] && !steps[i][2].test(out); st[i] = bad ? "fail" : "done";
+    failOut[a + "." + t + "." + i] = bad ? (out.trim().split(/\r?\n/).slice(-6).join("\n") || "(no output)") : "";
+    persist(); render(); n++;
+    if (bad && n <= prereq) { catchMsg = "Stopped: step " + (i + 1) + " failed, fix it first"; break; }
+    await sleep(500);
+  }
+  busy = false; if (!catchMsg.startsWith("Stopped")) catchMsg = ""; render(); term.focus();
+}
+
+$("runall").onclick = () => { if (busy) { stopFlag = true; return; } runSteps(T().steps.map((_, i) => i)); };
+$("clearticks").onclick = () => { if (busy) return; for (const t of Object.keys(ASSIGNMENTS[curA].tabs)) if (ASSIGNMENTS[curA].tabs[t].steps) states(curA, t).fill(""); delete saved.completed[curA]; persist(); render(); };
+$("reset").onclick = async () => {
+  const A = ASSIGNMENTS[curA];
+  if (busy || !A.reset || !ready() || !confirm("Undo what this assignment created inside the practice container and start over?")) return;
+  busy = true; render();
+  for (const c of A.reset) await runCommand(c);
+  for (const t of Object.keys(A.tabs)) if (A.tabs[t].steps) states(curA, t).fill("");
+  delete saved.completed[curA]; persist(); busy = false; render();
+};
+
+function setNav(open) { document.body.classList.toggle("nav-open", open); $("menu").setAttribute("aria-expanded", String(open)); }
+$("menu").onclick = () => setNav(!document.body.classList.contains("nav-open"));
+$("closenav").onclick = $("scrim").onclick = () => setNav(false);
+document.addEventListener("keydown", e => { if (e.key === "Escape") setNav(false); });
+const setView = v => { const app = document.querySelector(".app"); app.classList.toggle("v-steps", v === "steps"); app.classList.toggle("v-term", v === "term");
+  document.querySelectorAll("#views button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  if (v === "term") setTimeout(() => { try { const d = fit.proposeDimensions(); if (d && d.cols && d.rows) term.resize(d.cols, d.rows); send("1", JSON.stringify({ columns: term.cols, rows: term.rows })); } catch (e) {} term.focus(); }, 50); };
+document.querySelectorAll("#views button").forEach(b => b.onclick = () => setView(b.dataset.v));
+setView("steps");
+render(); connect();
+</script>
+</body>
+</html>

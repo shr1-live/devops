@@ -30,6 +30,16 @@ Topics and where my notes are:
 - Docker: image layers and cache, multi-stage builds, Alpine/Distroless, non-root user, `.dockerignore`, bridge/host networking, volumes.
 - Compose: `docker-compose.yml`, internal DNS, `depends_on` with `condition: service_healthy`, environment variable precedence.
 
+Daily progress:
+
+- [ ] Day 8 (W2 D1): Docker fundamentals: images, containers, run/exec/logs, layers, first Dockerfile: [[01_Docker_fundamentals]] (notes + lab topic 6 written, run the lab to tick)
+- [ ] Day 9: Dockerfile layer caching, `.dockerignore`, build context size
+- [ ] Day 10: multi-stage builds, slim/distroless bases, non-root user
+- [ ] Day 11: networking (bridge/host/internal) and volumes vs bind mounts
+- [ ] Day 12: Docker Compose, service discovery, `service_healthy`, env precedence
+- [ ] Day 13: image scanning (Trivy), storage drivers, container security
+- [ ] Day 14: milestone: multi-tier stack behind NGINX
+
 **Milestone lab:** containerize frontend + API + relational DB + Redis with multi-stage Dockerfiles, run behind NGINX with Compose, health checks and persistent volumes.
 
 ## Week 3: CI/CD, cloud, Terraform
