@@ -1,6 +1,6 @@
 # SSH Lab UI
 
-One page with five practice topics (Linux, Bash scripting, Networking, NGINX, Interview must-knows): steps with a plain-English note under each command, **Run** / **Copy** buttons, and a live terminal next to them. Static files only (HTML + xterm.js), no build step.
+One page with five practice topics (Linux, Bash scripting, Networking, NGINX, Docker), each in three levels (basic, next level, medium) plus interview Q&A, defined in `lab-topics.js`: steps with a plain-English note under each command, **Run** / **Copy** buttons, and a live terminal next to them. Static files only (HTML + xterm.js), no build step.
 
 ## Run it (full version, with the terminal)
 

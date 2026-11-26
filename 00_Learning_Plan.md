@@ -32,7 +32,7 @@ Topics and where my notes are:
 
 Daily progress:
 
-- [ ] Day 8 (W2 D1): Docker fundamentals: images, containers, run/exec/logs, layers, first Dockerfile: [[01_Docker_fundamentals]] (notes + lab topic 6 written, run the lab to tick)
+- [ ] Day 8 (W2 D1): Docker fundamentals: images, containers, run/exec/logs, layers, first Dockerfile: [[01_Docker_fundamentals]] (notes + lab topic 5 written, run the lab to tick)
 - [ ] Day 9: Dockerfile layer caching, `.dockerignore`, build context size
 - [ ] Day 10: multi-stage builds, slim/distroless bases, non-root user
 - [ ] Day 11: networking (bridge/host/internal) and volumes vs bind mounts

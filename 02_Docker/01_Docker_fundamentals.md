@@ -4,7 +4,7 @@ Plan: [[00_Learning_Plan]] (Week 2: containers). Builds on [[05_Filesystem_and_p
 
 **Goal of the day:** know what an image and a container are, run and inspect containers, read logs, get a shell inside one, understand layers, and write and build a first Dockerfile.
 
-Lab: open http://localhost:7000/ssh-lab.html, choose **6 · Docker basics (Week 2, Day 1)**. It runs in the toolbox terminal (port 7682), which talks to Docker Desktop. Everything it creates is named `d1-*`, and **Reset lab** removes only that.
+Lab: open http://localhost:7000/ssh-lab.html, choose **5 · Docker (Week 2)** and do Level 1, then 2, then 3. It runs in the toolbox terminal (port 7682), which talks to Docker Desktop. Everything it creates is named `lab-*`, and **Reset lab** removes only that. All commands are listed in [[Interview_Commands]].
 
 ## 01 The core idea
 
